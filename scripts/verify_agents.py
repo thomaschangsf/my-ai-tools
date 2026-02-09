@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Verify hello_world and principal_flow agents.
+Verify hello_world and plan_with_ollama agents.
 Run from repo root: uv run python scripts/verify_agents.py
 """
 import sys
@@ -11,7 +11,7 @@ from pathlib import Path
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from my_ai_tools.agents.hello_world import run_hello
-from my_ai_tools.agents.principal_flow import run_principal_flow
+from my_ai_tools.agents.plan_with_ollama import plan_with_ollama, resume_plan_with_ollama
 
 
 def verify_hello_world() -> bool:
@@ -24,17 +24,37 @@ def verify_hello_world() -> bool:
     return ok
 
 
-def verify_principal_flow() -> bool:
-    """Run principal_flow (Planner -> Interfacer -> Executor) in a temp dir."""
+def verify_plan_with_ollama() -> bool:
+    """Run plan_with_ollama (Planner -> review -> Interfacer -> review -> Executor) in a temp dir.
+
+    Automatically approves at each review checkpoint so the full pipeline runs.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         db_path = Path(tmp) / "agents_state.db"
         conn = sqlite3.connect(str(db_path), check_same_thread=False)
         checkpointer = SqliteSaver(conn)
+        checkpointer.setup()
+        thread_id = "verify-1"
         try:
-            run_principal_flow(
+            # Start the flow — runs planner, then pauses before plan_review
+            plan_with_ollama(
                 task_description="Add a function add(a,b) that returns a+b.",
                 project_root=tmp,
-                thread_id="verify-1",
+                thread_id=thread_id,
+                checkpointer=checkpointer,
+            )
+
+            # Approve plan — runs plan_review + interfacer, pauses before interface_review
+            resume_plan_with_ollama(
+                thread_id=thread_id,
+                human_feedback="approved",
+                checkpointer=checkpointer,
+            )
+
+            # Approve interface — runs interface_review + executor, completes
+            resume_plan_with_ollama(
+                thread_id=thread_id,
+                human_feedback="approved",
                 checkpointer=checkpointer,
             )
         finally:
@@ -63,9 +83,9 @@ def main() -> None:
         print("   FAIL\n")
         sys.exit(1)
 
-    print("2. principal_flow (requires Ollama running; uses OLLAMA_MODEL, default llama3.2)")
+    print("2. plan_with_ollama (requires Ollama running; uses OLLAMA_MODEL, default llama3.2)")
     try:
-        if verify_principal_flow():
+        if verify_plan_with_ollama():
             print("   OK\n")
         else:
             print("   FAIL (missing output files)\n")

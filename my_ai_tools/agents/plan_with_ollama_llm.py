@@ -1,6 +1,8 @@
-"""LLM helpers for principal flow (Ollama)."""
+"""LLM helpers for the Ollama-backed planning flow."""
 
 import ollama
+
+from .planning_common import load_skill
 
 
 def _chat(model: str, system: str, user: str) -> str:
@@ -19,14 +21,43 @@ def _chat(model: str, system: str, user: str) -> str:
 
 
 def generate_plan(task_description: str, project_root: str, model: str) -> str:
-    """Generate a plan and return markdown content for plan.md."""
+    """Generate a plan using the principal-ml-planning skill."""
+    skill = load_skill()
     system = (
-        "You are an ML engineering planner. Output a clear, actionable plan in markdown. "
-        "Write only the plan content, no preamble."
+        "You are a principal ML engineer at a FANG company. "
+        "Output a clear, actionable plan in markdown.\n\n"
     )
+    if skill:
+        system += f"Follow this planning framework:\n\n{skill}\n\n"
+    system += "Write only the plan content, no preamble."
     user = (
         f"Task: {task_description}\n\nProject path: {project_root}\n\n"
-        "Write plan.md content (markdown) for this task."
+        "Write plan.md content following the planning framework above."
+    )
+    return _chat(model, system, user)
+
+
+def generate_plan_revision(
+    task_description: str,
+    project_root: str,
+    existing_plan: str,
+    feedback: str,
+    model: str,
+) -> str:
+    """Revise an existing plan based on human feedback."""
+    skill = load_skill()
+    system = (
+        "You are a principal ML engineer at a FANG company. "
+        "Revise the given plan based on human feedback. Output improved markdown.\n\n"
+    )
+    if skill:
+        system += f"Follow this planning framework:\n\n{skill}\n\n"
+    system += "Write only the revised plan content, no preamble."
+    user = (
+        f"Task: {task_description}\n\nProject path: {project_root}\n\n"
+        f"Current plan:\n{existing_plan}\n\n"
+        f"Human feedback:\n{feedback}\n\n"
+        "Revise the plan to address the feedback."
     )
     return _chat(model, system, user)
 
@@ -40,6 +71,28 @@ def generate_interface(plan_content: str, project_root: str, model: str) -> str:
     user = (
         f"Plan:\n{plan_content}\n\nProject path: {project_root}\n\n"
         "Write interface.md content (APIs, types, signatures in markdown)."
+    )
+    return _chat(model, system, user)
+
+
+def generate_interface_revision(
+    plan_content: str,
+    project_root: str,
+    existing_interface: str,
+    feedback: str,
+    model: str,
+) -> str:
+    """Revise an existing interface based on human feedback."""
+    system = (
+        "You are a software architect. Revise the interface based on human feedback. "
+        "Output type hints, function signatures, and class signatures in markdown. "
+        "Write only the revised interface content, no preamble."
+    )
+    user = (
+        f"Plan:\n{plan_content}\n\nProject path: {project_root}\n\n"
+        f"Current interface:\n{existing_interface}\n\n"
+        f"Human feedback:\n{feedback}\n\n"
+        "Revise the interface to address the feedback."
     )
     return _chat(model, system, user)
 

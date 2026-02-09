@@ -118,3 +118,10 @@ def jupyter() -> None:
             cwd=None,
         )
     )
+
+
+def mcp_bridge() -> None:
+    """Start the MCP bridge server (mcp_bridge.py)."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    bridge = os.path.join(root, "mcp_bridge.py")
+    sys.exit(subprocess.call([sys.executable, bridge]))

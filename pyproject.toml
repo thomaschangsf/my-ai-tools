@@ -24,6 +24,7 @@ check = "my_ai_tools.cli:check"
 tests = "my_ai_tools.cli:tests"
 notebook = "my_ai_tools.cli:jupyter"
 ollama-serve = "my_ai_tools.cli:ollama_serve"
+mcp-bridge = "my_ai_tools.cli:mcp_bridge"
 
 [build-system]
 requires = ["hatchling"]
