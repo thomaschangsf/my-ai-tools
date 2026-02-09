@@ -1,0 +1,37 @@
+[project]
+name = "my-ai-tools"
+version = "0.1.0"
+description = "AI tools with Jupyter, LangGraph, and local Ollama"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "jupyter",
+    "langgraph",
+    "langgraph-checkpoint-sqlite",
+    "ollama",
+    "fastmcp",
+    "pandas",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[project.scripts]
+check = "my_ai_tools.cli:check"
+tests = "my_ai_tools.cli:tests"
+notebook = "my_ai_tools.cli:jupyter"
+ollama-serve = "my_ai_tools.cli:ollama_serve"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
