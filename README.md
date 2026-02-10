@@ -15,22 +15,95 @@ my-ai-tools/
 │   └── agents/                # LangGraph agents (MCP / planning flows)
 │       ├── __init__.py
 │       ├── hello_world.py
-│       ├── planning_common.py      # Shared state, file I/O, skill loading
-│       ├── plan_with_ollama.py     # Ollama-backed planning flow (autonomous)
-│       ├── plan_with_ollama_llm.py # Ollama LLM helpers
-│       └── plan_with_cursor.py     # Cursor-agent-backed planning flow (stub)
+│       ├── planning_common.py      # Shared state, file I/O, skill loading, context assembly
+│       ├── plan_auto.py            # Auto flow (LLM generates internally)
+│       ├── plan_auto_ollama.py     # Ollama LLM helpers for auto flow
+│       ├── plan_auto_anthropic.py  # Anthropic HTTP LLM helpers for auto flow
+│       └── plan_interactive.py     # Interactive flow (caller provides content)
 ├── scripts/
-│   └── verify_agents.py       # Verification script for agents
+│   ├── verify_agents.py            # Master verification (hello + interactive + auto)
+│   ├── verify_plan_interactive.py  # Interactive flow tests (no LLM needed)
+│   ├── verify_plan_auto.py         # Auto flow tests (requires Ollama)
+│   └── plan_cli.py                 # Terminal CLI for interactive flow
 ├── mcp_bridge.py              # MCP server entry point (Cursor)
+├── docs/
+│   ├── Architecture.md        # Architecture, diagrams, rationale
+│   └── Dev.md                 # Developer cookbook & worked examples
 ├── specs/
 ├── pyproject.toml
 └── README.md
 ```
 
-- **`my_ai_tools`** is the only package. It is installed when you `uv sync` and provides the CLI entry points and the agents. Everything lives under this package.
-- **`planning_common.py`** holds the shared `PlanningState`, file conventions, and SKILL.md loading used by both `plan_with_ollama` and (future) `plan_with_cursor`.
-- **`scripts/`** holds one-off runnable scripts (e.g. verification) that use the installed package.
-- **`mcp_bridge.py`** is at the repo root so Cursor can be pointed at it; it imports from `my_ai_tools.agents`.
+## Design: Two orthogonal axes
+
+> Full architecture, diagrams, and rationale: [docs/Architecture.md](docs/Architecture.md)
+> Developer cookbook and worked examples: [docs/Dev.md](docs/Dev.md)
+
+The planning system separates **control flow** from **LLM backend**:
+
+### Axis 1: Control flow (who drives the loop?)
+
+| | **Auto** | **Interactive** |
+|---|---|---|
+| **Direction** | Push — graph calls LLM internally | Pull — graph returns context, caller provides content |
+| **Human role** | Review & approve/revise between stages | Generate (or delegate to LLM) + review at each stage |
+| **Graph** | `plan_auto.py` | `plan_interactive.py` |
+| **MCP tools** | `plan_auto_start`, `plan_auto_resume` | `plan_interactive_start`, `plan_interactive_resume` |
+
+### Axis 2: LLM backend (who generates the content?)
+
+| Backend | Auto flow | Interactive flow |
+|---|---|---|
+| **Ollama** (local) | Yes — `plan_auto_ollama.py` | Yes — via `plan_cli.py` |
+| **Anthropic** (HTTP) | Yes — `plan_auto_anthropic.py` | Yes — via `plan_cli.py` with `PLANNING_LLM=anthropic` |
+| **Cursor's LLM** | No (Cursor can't be called from inside a tool) | Yes — Cursor reads context and generates |
+| **OpenAI / others** | Add `plan_auto_<name>.py` + register in `_BACKENDS` | Yes — via `plan_cli.py` with new backend |
+| **Manual** (human) | No | Yes — `PLANNING_LLM=none plan_cli.py` |
+
+### Why interactive mode is LLM-agnostic
+
+The interactive graph **never calls an LLM**. Its information flow is:
+
+```
+Agent  ──context_bundle (str)──▶  [ANY caller]  ──content (str)──▶  Agent
+```
+
+At each phase the graph:
+1. **Assembles** a context string (task + SKILL.md + prior artifacts + feedback)
+2. **Returns** it to the caller (pauses)
+3. **Receives** generated content back as a plain string
+
+Because the interface is *strings in, strings out*, any LLM backend works — the
+graph doesn't know or care what produced the content.
+
+**Example — same graph, three different backends:**
+
+```
+# 1. Cursor's LLM (in chat)
+#    plan_interactive_start returns context → Cursor generates plan → plan_interactive_resume(content=...)
+
+# 2. Ollama (via CLI)
+PLANNING_LLM=ollama uv run python scripts/plan_cli.py "Build a cache" /tmp/proj
+#    plan_cli.py sends context to Ollama, feeds response back to graph
+
+# 3. Anthropic (via CLI)
+PLANNING_LLM=anthropic uv run python scripts/plan_cli.py "Build a cache" /tmp/proj
+#    plan_cli.py sends context to Anthropic API, feeds response back to graph
+
+# 4. Manual (human pastes content)
+PLANNING_LLM=none uv run python scripts/plan_cli.py "Build a cache" /tmp/proj
+```
+
+In contrast, the **auto** flow embeds the LLM call inside the graph nodes. Switching
+backends requires passing a different `backend=` parameter (e.g. `"ollama"` or
+`"anthropic"`), which selects the corresponding `plan_auto_*.py` module.
+
+### What's shared (`planning_common.py`)
+
+- `PlanningState` — state schema
+- File conventions — `plan.md`, `interface.md`, `generated_module.py`, `test_baseline.py`
+- `load_skill()` — loads `~/.cursor/skills/principal-ml-planning/SKILL.md`
+- Context assembly — `assemble_plan_context()`, `assemble_interface_context()`, `assemble_code_context()`
 
 ## Setup
 
@@ -41,99 +114,83 @@ uv sync --extra dev
 
 ## Commands
 
-- **`uv run check`** — Run Ruff (lint), MCP bridge check (loads bridge and validates tools), and `scripts/verify_agents.py`. All must pass.
+- **`uv run check`** — Run Ruff (lint), MCP bridge check, and verify all agents.
 - **`uv run tests`** — Run pytest.
-- **`uv run notebook`** — Start Jupyter Notebook (opens in browser). Or use **`uv run jupyter notebook`**.
-- **`uv run ollama-serve`** — Start Ollama locally if not already running (requires [Ollama](https://ollama.com) installed).
-- **`uv run mcp-bridge`** — Start the MCP bridge server (`mcp_bridge.py`).
-- **`uv run python scripts/verify_agents.py`** — Run agent verification only (included in `uv run check`).
-
-## Local Ollama
-
-Ollama is used over HTTP at `http://localhost:11434` (default). Ensure Ollama is running locally, then in Python:
-
-```python
-from my_ai_tools.ollama_client import get_client
-
-client = get_client()  # or get_client(host="http://localhost:11434")
-# or use the ollama package directly:
-# from ollama import Client
-# client = Client(host="http://localhost:11434")
-```
+- **`uv run notebook`** — Start Jupyter Notebook (opens in browser).
+- **`uv run ollama-serve`** — Start Ollama locally if not already running.
+- **`uv run mcp-bridge`** — Start the MCP bridge server.
+- **`uv run python scripts/plan_cli.py "task" /path`** — Terminal planning CLI.
 
 ## MCP: Global Agents (Cursor)
 
-This repo provides an MCP server with stateful LangGraph agents that can be invoked from any local project in Cursor.
+Register the MCP server in `~/.cursor/mcp.json` or via Cursor settings.
 
-**Cursor registration:** add an MCP server with this command (replace the path with your absolute repo path):
-
-```bash
-python3 /ABSOLUTE_PATH_TO_FILE/mcp_bridge.py
-```
-
-Example if the repo is at `/Users/me/my-ai-tools`:
-
-```bash
-python3 /Users/me/my-ai-tools/mcp_bridge.py
-```
-
-Or from the repo directory with uv:
+From the repo directory with uv:
 
 ```bash
 uv run mcp-bridge
 ```
 
-**Tools:**
+**MCP tools (5):**
 
-- **run_hello** — Hello-world agent: prepends `"Global Agent Response:"` to the input.
-- **plan_with_ollama** — Start the Ollama-backed iterative planning flow (see below). Returns a `thread_id` for use with `resume_flow`.
-- **resume_flow** — Resume the planning flow after human review. Pass `feedback='approved'` to proceed or provide revision notes to loop back.
-
-### Planning flow (human-in-the-loop)
-
-The planning flow is iterative with human review at each stage:
-
-```
-START -> Planner -> [human review] -> Interfacer -> [human review] -> Executor -> END
-                  \--- revise ------/             \--- revise ------/
-```
-
-1. **`plan_with_ollama(task_description, project_root)`** — Runs the planner (using `~/.cursor/skills/principal-ml-planning/SKILL.md` as the planning framework) and writes `plan.md`. The flow pauses and returns a `thread_id`.
-2. **Review `plan.md`** in the project directory.
-3. **`resume_flow(thread_id, 'approved')`** — Approves the plan and runs the interfacer, which writes `interface.md`. The flow pauses again.
-   - Or **`resume_flow(thread_id, '<revision notes>')`** — Sends the plan back to the planner with your feedback for revision.
-4. **Review `interface.md`**.
-5. **`resume_flow(thread_id, 'approved')`** — Approves the interface and runs the executor, which writes `generated_module.py` and `test_baseline.py`. The flow completes.
-   - Or provide revision feedback to loop back to the interfacer.
-
-Uses local Ollama for generation; set `OLLAMA_MODEL` if needed (default: `llama3.2`).
-
-### Architecture: Ollama vs Cursor backends
-
-The planning logic is split so that both Ollama and Cursor can serve as the intelligence layer:
-
-| | `plan_with_ollama` | `plan_with_cursor` (future) |
+| Tool | Flow | What it does |
 |---|---|---|
-| **Intelligence** | Local Ollama model | Cursor's LLM |
-| **Flow** | Autonomous — LLM calls happen inside the agent | Collaborative — MCP tools provide state/context, Cursor generates |
-| **Shared** | `PlanningState`, file conventions, SKILL.md | Same |
+| `run_hello` | — | Test tool: prepends "Global Agent Response:" to input |
+| `plan_auto_start` | Auto | Start auto flow — LLM generates plan.md. `backend`: `"ollama"` (default) or `"anthropic"`. |
+| `plan_auto_resume` | Auto | Approve (`'approved'`) or revise (feedback text). LLM regenerates. |
+| `plan_interactive_start` | Interactive | Start interactive flow — returns context bundle. Caller generates content. |
+| `plan_interactive_resume` | Interactive | Save content (advances phase) or send feedback (revise same phase). |
+
+### Auto flow
+
+```
+START -> Planner -> [review] -> Interfacer -> [review] -> Executor -> END
+                  \-- revise --/            \-- revise --/
+```
+
+The LLM backend generates all content. You just review and approve/revise.
+Default backend is Ollama; pass `backend="anthropic"` to use the Anthropic API.
+
+```bash
+# Anthropic backend (requires ANTHROPIC_API_KEY)
+export ANTHROPIC_API_KEY="sk-ant-..."
+# Then use plan_auto_start with backend="anthropic"
+```
+
+### Interactive flow
+
+```
+START -> Assemble context -> [caller generates] -> Save -> Assemble next -> ... -> END
+                               \--- feedback ----/
+```
+
+The graph never calls an LLM. It assembles context (including SKILL.md) and pauses. The caller — Cursor's agent, a terminal CLI, or a human — generates the content and feeds it back.
+
+Cross-session: LangGraph checkpoints persist to SQLite, so you can resume with the same thread_id across sessions.
+
+### Terminal CLI
+
+```bash
+# With Ollama (default)
+uv run python scripts/plan_cli.py "Build a URL shortener" /tmp/my-project
+
+# With Anthropic
+PLANNING_LLM=anthropic ANTHROPIC_API_KEY="sk-ant-..." \
+  uv run python scripts/plan_cli.py "Build a URL shortener" /tmp/my-project
+
+# Manual mode (paste content yourself)
+PLANNING_LLM=none uv run python scripts/plan_cli.py "Build a URL shortener" /tmp/my-project
+```
 
 ### Verifying the agents
 
-**1. One command (recommended)** — From the repo root:
-
 ```bash
+# All agents (hello + interactive + auto)
 uv run python scripts/verify_agents.py
+
+# Interactive only (no LLM needed)
+uv run python scripts/verify_plan_interactive.py
+
+# Auto only (requires Ollama)
+uv run python scripts/verify_plan_auto.py
 ```
-
-This runs **hello_world** (always) and **plan_with_ollama** in a temp directory. For plan_with_ollama you need Ollama running and a model (e.g. `ollama pull llama3.2`).
-
-**2. Quick hello_world check** — From the repo root:
-
-```bash
-uv run python -c "from my_ai_tools.agents.hello_world import run_hello; print(run_hello('hi'))"
-```
-
-Expected output: `Global Agent Response: hi`.
-
-**3. Via MCP in Cursor** — After registering the MCP server, use the **run_hello** and **plan_with_ollama** tools from the Cursor AI panel.

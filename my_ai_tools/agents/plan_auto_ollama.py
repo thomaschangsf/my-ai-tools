@@ -1,15 +1,23 @@
-"""LLM helpers for the Ollama-backed planning flow."""
+"""LLM helpers for the auto planning flow (Ollama backend).
+
+Environment variables:
+    OLLAMA_MODEL    Model name (default: llama3.2).
+"""
+
+import os
 
 import ollama
 
 from .planning_common import load_skill
 
+_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
 
-def _chat(model: str, system: str, user: str) -> str:
+
+def _chat(system: str, user: str) -> str:
     """Single turn with system + user message. Returns assistant content."""
     try:
         r = ollama.chat(
-            model=model,
+            model=_MODEL,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -20,7 +28,11 @@ def _chat(model: str, system: str, user: str) -> str:
         return f"[LLM error: {e}]"
 
 
-def generate_plan(task_description: str, project_root: str, model: str) -> str:
+# ---------------------------------------------------------------------------
+# Public interface — same signatures as plan_auto_anthropic
+# ---------------------------------------------------------------------------
+
+def generate_plan(task_description: str, project_root: str) -> str:
     """Generate a plan using the principal-ml-planning skill."""
     skill = load_skill()
     system = (
@@ -34,7 +46,7 @@ def generate_plan(task_description: str, project_root: str, model: str) -> str:
         f"Task: {task_description}\n\nProject path: {project_root}\n\n"
         "Write plan.md content following the planning framework above."
     )
-    return _chat(model, system, user)
+    return _chat(system, user)
 
 
 def generate_plan_revision(
@@ -42,7 +54,6 @@ def generate_plan_revision(
     project_root: str,
     existing_plan: str,
     feedback: str,
-    model: str,
 ) -> str:
     """Revise an existing plan based on human feedback."""
     skill = load_skill()
@@ -59,10 +70,10 @@ def generate_plan_revision(
         f"Human feedback:\n{feedback}\n\n"
         "Revise the plan to address the feedback."
     )
-    return _chat(model, system, user)
+    return _chat(system, user)
 
 
-def generate_interface(plan_content: str, project_root: str, model: str) -> str:
+def generate_interface(plan_content: str, project_root: str) -> str:
     """Generate interface (type hints / class signatures) for interface.md."""
     system = (
         "You are a software architect. Output type hints, function signatures, and class "
@@ -72,7 +83,7 @@ def generate_interface(plan_content: str, project_root: str, model: str) -> str:
         f"Plan:\n{plan_content}\n\nProject path: {project_root}\n\n"
         "Write interface.md content (APIs, types, signatures in markdown)."
     )
-    return _chat(model, system, user)
+    return _chat(system, user)
 
 
 def generate_interface_revision(
@@ -80,7 +91,6 @@ def generate_interface_revision(
     project_root: str,
     existing_interface: str,
     feedback: str,
-    model: str,
 ) -> str:
     """Revise an existing interface based on human feedback."""
     system = (
@@ -94,11 +104,11 @@ def generate_interface_revision(
         f"Human feedback:\n{feedback}\n\n"
         "Revise the interface to address the feedback."
     )
-    return _chat(model, system, user)
+    return _chat(system, user)
 
 
 def generate_code_and_tests(
-    interface_content: str, project_root: str, model: str
+    interface_content: str, project_root: str
 ) -> tuple[str, str]:
     """Generate boilerplate code and test_baseline.py content. Returns (code, tests)."""
     system = (
@@ -110,7 +120,7 @@ def generate_code_and_tests(
         f"Interface:\n{interface_content}\n\nProject path: {project_root}\n\n"
         "1) Generate Python module boilerplate. 2) Generate test_baseline.py with pytest tests."
     )
-    raw = _chat(model, system, user)
+    raw = _chat(system, user)
     if "## TEST" in raw:
         parts = raw.split("## TEST", 1)
         code = parts[0].replace("## MODULE", "").strip()

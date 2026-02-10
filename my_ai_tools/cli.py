@@ -77,8 +77,24 @@ if root not in sys.path:
     sys.path.insert(0, root)
 import mcp_bridge
 assert mcp_bridge.mcp.name == "GlobalAgents"
+
+# Verify all expected MCP tools are registered
 from my_ai_tools.agents.hello_world import run_hello
 assert run_hello("x") == "Global Agent Response: x"
+
+expected_tools = [
+    "run_hello",
+    "plan_auto_start",
+    "plan_auto_resume",
+    "plan_interactive_start",
+    "plan_interactive_resume",
+]
+print("MCP tools registered:")
+for name in expected_tools:
+    found = hasattr(mcp_bridge, name)
+    print(f"  {name}: {'OK' if found else 'MISSING'}")
+    assert found, f"MCP tool {name!r} not found in mcp_bridge"
+
 print("MCP bridge OK")
 """
     r = subprocess.call([sys.executable, "-c", code])
@@ -86,7 +102,7 @@ print("MCP bridge OK")
 
 
 def check() -> None:
-    """Run ruff (lint), MCP bridge check, and verify_agents.py."""
+    """Run ruff, MCP bridge check, and verify_agents (hello_world + cursor + ollama)."""
     root = os.getcwd()
     steps = [
         ("Ruff", [sys.executable, "-m", "ruff", "check", "."]),
