@@ -23,12 +23,13 @@ flowchart TB
     end
 
     subgraph Bridge["MCP Bridge (mcp_bridge.py)"]
-        MCP["FastMCP server<br/>5 tools exposed"]
+        MCP["FastMCP server<br/>7 tools exposed"]
     end
 
     subgraph Flows["Planning Flows (LangGraph)"]
         Auto["Auto flow<br/>plan_auto.py"]
         Interactive["Interactive flow<br/>plan_interactive.py"]
+        PRReview["PR review flow<br/>pr_review.py"]
     end
 
     subgraph Backends["LLM Backends (pluggable)"]
@@ -50,11 +51,18 @@ flowchart TB
         Tests["test_baseline.py"]
     end
 
+    subgraph Scripts["Scripts"]
+        GitUtils["scripts/git-utils.sh<br/>pr_review_v2"]
+    end
+
     Cursor -->|stdio| MCP
     CLI --> Flows
     Script --> Flows
     MCP --> Auto
     MCP --> Interactive
+    MCP --> PRReview
+
+    PRReview --> GitUtils
 
     Auto -->|closure over backend| Ollama
     Auto -->|closure over backend| Anthropic
@@ -80,7 +88,7 @@ flowchart TB
 
 **Role:** Entry point for Cursor and other MCP clients.
 
-Wraps the planning flows as five MCP tools over stdio:
+Wraps the planning flows as seven MCP tools over stdio:
 
 | Tool | Delegates to |
 |---|---|
@@ -89,6 +97,8 @@ Wraps the planning flows as five MCP tools over stdio:
 | `plan_auto_resume` | `plan_auto.resume_auto_plan` |
 | `plan_interactive_start` | `plan_interactive.start_interactive_plan` |
 | `plan_interactive_resume` | `plan_interactive.resume_interactive_plan` |
+| `pr_review_start` | `pr_review.start_pr_review` |
+| `pr_review_resume` | `pr_review.resume_pr_review` |
 
 Owns the global SQLite checkpointer (`agents_state.db`) and generates
 `thread_id`s for new sessions.
@@ -159,6 +169,19 @@ stateDiagram-v2
   construction**. Cursor, Ollama, Anthropic, or a human pasting text all
   work identically — the graph doesn't know or care what produced the content.
 - Phases: `plan` → `interface` → `code` → `done`.
+
+#### PR review flow (`pr_review.py`)
+
+```
+Direction: Push — pull PR via git-utils, one LLM review, then one recommendation at a time.
+Human role: Approve (next) or abort between recommendations.
+```
+
+- **4 nodes:** pull_data → review → present_recommendation → gate (loop or END).
+- **Data pull:** Runs `scripts/git-utils.sh pr_review_v2 <url>`, captures the one-line eval command from stdout, executes it in a subprocess so the repo is cloned/updated and on the PR branch. The workflow runs that command; the user's shell does not change unless they run it manually.
+- **Review:** In the cloned repo, runs `git status`, `git diff`, `git diff origin/<base>...HEAD`, loads `prompts/Prompt-PR-Review.md`, and calls the LLM (Anthropic) once. The model is asked to end with a **## Recommendations** numbered list, which is parsed into a list and shown one at a time.
+- **Interrupt:** `interrupt_before=["present_recommendation"]` so the graph pauses before each recommendation. `pr_review_resume(thread_id, feedback)` with `feedback='approved'` (or `'next'`, `'continue'`) advances to the next; `feedback='abort'` ends the flow.
+- **Env:** `REVIEWS_DIR` (default from git-utils), `BASE_BRANCH` (default `master`), `ANTHROPIC_API_KEY` for the review LLM.
 
 ---
 
@@ -362,7 +385,7 @@ No changes to `plan_interactive.py` — it's completely LLM-agnostic.
 
 ```
 my-ai-tools/
-├── mcp_bridge.py                     # MCP entry point (5 tools)
+├── mcp_bridge.py                     # MCP entry point (7 tools)
 ├── my_ai_tools/
 │   ├── cli.py                        # UV commands (check, tests, etc.)
 │   ├── ollama_client.py              # Ollama HTTP helper
@@ -372,8 +395,12 @@ my-ai-tools/
 │       ├── plan_auto_ollama.py       # Ollama backend (local)
 │       ├── plan_auto_anthropic.py    # Anthropic backend (HTTP)
 │       ├── plan_interactive.py       # Interactive graph (LLM-agnostic)
+│       ├── pr_review.py              # PR review graph (git-utils + one-at-a-time recommendations)
 │       └── hello_world.py            # Test agent
+├── prompts/
+│   └── Prompt-PR-Review.md           # Principal ML Eng PR review prompt
 ├── scripts/
+│   ├── git-utils.sh                  # pr_review_v2: clone/fetch PR, emit eval command
 │   ├── plan_cli.py                   # Terminal CLI for interactive flow
 │   ├── verify_agents.py              # Master verification
 │   ├── verify_plan_interactive.py    # Interactive tests (no LLM)

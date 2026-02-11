@@ -19,8 +19,12 @@ my-ai-tools/
 │       ├── plan_auto.py            # Auto flow (LLM generates internally)
 │       ├── plan_auto_ollama.py     # Ollama LLM helpers for auto flow
 │       ├── plan_auto_anthropic.py  # Anthropic HTTP LLM helpers for auto flow
-│       └── plan_interactive.py     # Interactive flow (caller provides content)
+│       ├── plan_interactive.py     # Interactive flow (caller provides content)
+│       └── pr_review.py            # PR review flow (git-utils + one recommendation at a time)
+├── prompts/
+│   └── Prompt-PR-Review.md         # Principal ML Eng PR review prompt
 ├── scripts/
+│   ├── git-utils.sh                # pr_review_v2: clone/fetch PR, emit eval command
 │   ├── verify_agents.py            # Master verification (hello + interactive + auto)
 │   ├── verify_plan_interactive.py  # Interactive flow tests (no LLM needed)
 │   ├── verify_plan_auto.py         # Auto flow tests (requires Ollama)
@@ -131,7 +135,7 @@ From the repo directory with uv:
 uv run mcp-bridge
 ```
 
-**MCP tools (5):**
+**MCP tools (7):**
 
 | Tool | Flow | What it does |
 |---|---|---|
@@ -140,6 +144,8 @@ uv run mcp-bridge
 | `plan_auto_resume` | Auto | Approve (`'approved'`) or revise (feedback text). LLM regenerates. |
 | `plan_interactive_start` | Interactive | Start interactive flow — returns context bundle. Caller generates content. |
 | `plan_interactive_resume` | Interactive | Save content (advances phase) or send feedback (revise same phase). |
+| `pr_review_start` | PR review | Start PR review: pull PR via git-utils, run review, show first recommendation. |
+| `pr_review_resume` | PR review | Next recommendation (`feedback='approved'`) or abort (`feedback='abort'`). |
 
 ### Auto flow
 
@@ -167,6 +173,10 @@ START -> Assemble context -> [caller generates] -> Save -> Assemble next -> ... 
 The graph never calls an LLM. It assembles context (including SKILL.md) and pauses. The caller — Cursor's agent, a terminal CLI, or a human — generates the content and feeds it back.
 
 Cross-session: LangGraph checkpoints persist to SQLite, so you can resume with the same thread_id across sessions.
+
+### PR review flow
+
+Runs `scripts/git-utils.sh pr_review_v2 <PR URL>` to clone/fetch the PR locally (the workflow executes the emitted command in a subprocess; your shell does not change). Then runs one LLM review using `prompts/Prompt-PR-Review.md` and presents recommendations one at a time. Call `pr_review_resume` with `feedback='approved'` for the next recommendation or `feedback='abort'` to stop. Requires `ANTHROPIC_API_KEY` for the review LLM.
 
 ### Terminal CLI
 

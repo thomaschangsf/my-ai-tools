@@ -19,6 +19,10 @@ from my_ai_tools.agents.plan_interactive import (
     start_interactive_plan as _start_interactive_plan,
     resume_interactive_plan as _resume_interactive_plan,
 )
+from my_ai_tools.agents.pr_review import (
+    start_pr_review as _start_pr_review,
+    resume_pr_review as _resume_pr_review,
+)
 
 # SQLite checkpointer in global directory (same dir as this file; not the target project)
 _REPO_ROOT = Path(__file__).resolve().parent
@@ -205,6 +209,102 @@ def plan_interactive_resume(thread_id: str, content: str = "", feedback: str = "
             )
     except Exception as e:
         return f"Resume plan error: {e}"
+
+
+# ---------------------------------------------------------------------------
+# PR review — one recommendation at a time, approve before next
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def pr_review_start(pr_url: str) -> str:
+    """
+    Start a PR review flow (pull PR locally, run review, show recommendations one at a time).
+
+    Runs scripts/git-utils.sh pr_review_v2 to clone/fetch the PR, then runs the Principal ML
+    Engineer review prompt. Returns the first recommendation and a thread_id.
+    Call pr_review_resume with that thread_id and feedback 'approved' to get the next
+    recommendation, or 'abort' to stop.
+    """
+    thread_id = str(uuid.uuid4())
+    try:
+        result = _start_pr_review(
+            pr_url=pr_url,
+            thread_id=thread_id,
+            checkpointer=_checkpointer,
+        )
+        phase = result.get("phase", "")
+        recommendations = result.get("recommendations") or []
+        current_index = result.get("current_index", 0)
+        repo_path = result.get("repo_path", "")
+        if phase == "error":
+            return (
+                f"PR review error: {result.get('full_review_text', 'Unknown error')}\n"
+                f"Thread ID: {thread_id}"
+            )
+        if not recommendations:
+            return (
+                f"No recommendations produced. Thread ID: {thread_id}\n"
+                f"Repo path: {repo_path}"
+            )
+        first = recommendations[current_index] if current_index < len(recommendations) else recommendations[0]
+        return (
+            f"Thread ID: {thread_id}\n"
+            f"Repo path: {repo_path}\n\n"
+            f"## Recommendation 1 of {len(recommendations)}\n\n{first}\n\n"
+            f"---\n"
+            f"To get the next recommendation, call pr_review_resume with thread_id={thread_id!r} and feedback='approved'. "
+            f"Say feedback='abort' to stop."
+        )
+    except Exception as e:
+        return f"PR review start error: {e}"
+
+
+@mcp.tool()
+def pr_review_resume(thread_id: str, feedback: str) -> str:
+    """
+    Resume PR review after reviewing one recommendation.
+
+    - feedback='approved' (or 'next', 'continue'): show the next recommendation.
+    - feedback='abort': end the review.
+    - Other feedback: stay on the same recommendation (e.g. ask more questions in chat).
+    """
+    try:
+        result = _resume_pr_review(
+            thread_id=thread_id,
+            human_feedback=feedback or "",
+            checkpointer=_checkpointer,
+        )
+        phase = result.get("phase", "")
+        recommendations = result.get("recommendations") or []
+        current_index = result.get("current_index", 0)
+        if phase == "aborted":
+            return f"Review aborted. Thread ID: {thread_id}"
+        if phase == "done":
+            return (
+                f"All recommendations shown ({len(recommendations)} total).\n"
+                f"Thread ID: {thread_id}"
+            )
+        if current_index < len(recommendations):
+            rec = recommendations[current_index]
+            n = current_index + 1
+            fb_lower = (feedback or "").strip().lower()
+            is_approve = fb_lower in ("approved", "next", "continue", "yes", "ok")
+            ask_more_note = (
+                "\n(Staying on this recommendation. You can ask questions in chat; "
+                "say 'approved' for next or 'abort' to stop.)\n\n"
+                if feedback and not is_approve and fb_lower != "abort"
+                else ""
+            )
+            return (
+                f"Thread ID: {thread_id}\n"
+                f"## Recommendation {n} of {len(recommendations)}\n\n{rec}\n\n"
+                f"{ask_more_note}"
+                f"---\n"
+                f"Call pr_review_resume with feedback='approved' for next, or 'abort' to stop."
+            )
+        return f"Thread ID: {thread_id}\nNo more recommendations."
+    except Exception as e:
+        return f"PR review resume error: {e}"
 
 
 if __name__ == "__main__":

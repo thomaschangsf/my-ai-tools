@@ -61,6 +61,11 @@ def _chat(system: str, user: str) -> str:
         return f"[LLM error: {e}]"
 
 
+def chat(system: str, user: str) -> str:
+    """Single-turn chat (public). Used by pr_review and other flows."""
+    return _chat(system, user)
+
+
 # ---------------------------------------------------------------------------
 # Public interface — same signatures as plan_auto_ollama
 # ---------------------------------------------------------------------------

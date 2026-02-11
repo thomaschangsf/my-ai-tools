@@ -88,6 +88,8 @@ expected_tools = [
     "plan_auto_resume",
     "plan_interactive_start",
     "plan_interactive_resume",
+    "pr_review_start",
+    "pr_review_resume",
 ]
 print("MCP tools registered:")
 for name in expected_tools:

@@ -207,6 +207,40 @@ conn.close()
 
 
 # -------------------------------------------
+# PR review flow (pr_review_start / pr_review_resume)
+# -------------------------------------------
+# Pull a PR locally via scripts/git-utils.sh pr_review_v2, run one LLM review,
+# then show recommendations one at a time. You approve to get the next or say abort.
+#
+# Prerequisites:
+#   - export ANTHROPIC_API_KEY="sk-ant-..."   (review uses Anthropic)
+#   - A Pull Request URL that git-utils supports (e.g. .../pull/123)
+#   - REVIEWS_DIR (optional): where to clone; default from git-utils
+#
+# === From Cursor chat (via MCP) ===
+#
+# 1. Start:
+#    "Use the MCP tool pr_review_start with pr_url '<your PR URL>'"
+#    Example: pr_url = "https://github.com/owner/repo/pull/42"
+#    Cursor returns thread_id, repo path, and the first recommendation.
+#
+# 2. Next recommendation or abort:
+#    "Use pr_review_resume with thread_id '<paste-thread-id>' and feedback 'approved'"
+#    Or: feedback 'abort' to stop.
+#
+# 3. Stay on same recommendation (ask more):
+#    Send any other feedback (e.g. "Why is this a blocker?"); you get the same
+#    recommendation again with a note to say 'approved' or 'abort'.
+#
+# === Quick MCP server check (no real PR) ===
+#
+cd ... my-ai-tools
+uv run mcp-bridge
+# In another terminal / Cursor: ensure my-ai-tools MCP server is configured and
+# tools pr_review_start, pr_review_resume appear. A full test requires a real PR URL.
+
+
+# -------------------------------------------
 # Interactive flow (plan_interactive): caller provides content
 # -------------------------------------------
 # The graph assembles context (including SKILL.md) and pauses.
