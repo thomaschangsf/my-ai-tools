@@ -11,6 +11,36 @@ uv run python -c "
 from mcp_bridge import run_hello
 print(run_hello('test'))"
 
+# -------------------------------------------
+# MCP tools registered:
+# -------------------------------------------
+run_hello: OK
+plan_auto_start: OK
+plan_auto_resume: OK
+plan_interactive_start: OK
+plan_interactive_resume: OK
+
+### Difference between auto and interactive
+- IMOW: auto vs interactive controls whether the MCP tool (using its configured LLM backend) generates the planning artifacts (auto) or whether the client/user supplies the artifact content while the tool mainly provides context and advances phases (interactive).
+- plan_auto_* (auto)
+    The tool’s backend LLM generates the planning artifacts for you (planner → review → interfacer → review → executor).
+    You mainly provide the task description up front, then provide approval or revision feedback at review gates.
+    You can pick the LLM backend via backend (per the docstring: "ollama" default or "anthropic").
+- plan_interactive_* (interactive) (cursor)
+    The tool is LLM-agnostic: it returns a context bundle, and you (or an external LLM / your own reasoning) produce the artifact text.
+    You then send that artifact back via plan_interactive_resume(content=...) to advance phases, or send feedback=... to regenerate the context for the same phase.
+
+### Difference between start and resume
+- IMOW: start creates a new planning thread and resume continues it via a thread_id, which provides persistence across the multi-step human review/feedback loop.
+- *_start
+    Creates a new planning thread for a given task_description.
+    Returns a thread_id (and, for interactive, a context bundle; for auto, it writes the first artifact and pauses for review).
+- *_resume
+    Continues an existing thread identified by thread_id.
+    You either:
+    Approve to advance (auto: feedback="approved"), or
+    Provide revision feedback (auto: feedback="<notes>"), or
+    For interactive: provide the next artifact (content="...") or feedback to re-issue context for the same phase.
 
 # -------------------------------------------
 # Use in any cursor proejct
