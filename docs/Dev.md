@@ -38,13 +38,13 @@ Use the MCP tool my-ai-tools.run_hello with input_text = "hi"
 # Bad: one time flow
 my-ai-tools.plan_interactive_start with these input parameters:
 	task_description: "url shortner"
-	project_root: /Users/thomaschang/Documents/dev/git/a360/edc-python/tmp
+	project_root: /Users/chang/Documents/dev/git/ml/my-ai-tools/tmp
 
 
 # I might need to switch to plan mode
-Run my-ai-tools.plan_interactive in stage-gated mode. After each phase (plan → interface → code → test), stop and ask me whether to proceed. Don’t call *_resume until I reply with either approved or feedback. If I give feedback, apply it and show me the updated artifact before asking to proceed again. Pass in these input parameters:
+Run my-ai-tools.plan_interactive in stage-gated mode. After each phase (plan → interface → code → test), stop and ask me whether to proceed. Don’t call *_resume until I reply with either approved or feedback. If I give feedback, apply it and show me the updated artifact before asking to proceed again. Pass in these input parameters:
 	task_description: "url shortner"
-	project_root: /Users/thomaschang/Documents/dev/git/a360/xyz/tmp
+	project_root: /Users/chang/Documents/dev/git/ml/my-ai-tools/tmp
 
 # From current cursor project, reload cursor everytime my-ai-tools changes
 Cursor Command Pallete: "Developer: reload Window"

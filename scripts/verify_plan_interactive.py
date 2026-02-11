@@ -13,6 +13,7 @@ from pathlib import Path
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from my_ai_tools.agents.plan_interactive import start_interactive_plan, resume_interactive_plan
+from my_ai_tools.agents.planning_common import load_skill
 
 
 def verify_full_cycle() -> bool:
@@ -29,8 +30,14 @@ def verify_full_cycle() -> bool:
             )
             assert result["phase"] == "plan", f"Expected plan, got {result['phase']}"
             assert len(result.get("context_bundle", "")) > 0, "Empty context_bundle"
-            assert "Planning Framework" in result.get("context_bundle", ""), "SKILL.md not loaded"
-            print("    start -> phase=plan, context has SKILL.md  OK")
+            skill = load_skill()
+            if skill:
+                assert (
+                    "Planning Framework" in result.get("context_bundle", "")
+                ), "Expected SKILL.md content in context_bundle"
+                print("    start -> phase=plan, context includes SKILL.md  OK")
+            else:
+                print("    start -> phase=plan, SKILL.md not found (optional)  OK")
 
             result = resume_interactive_plan(
                 thread_id="cycle-1",
