@@ -1,14 +1,14 @@
 """
-PR review flow: pull PR via git-utils pr_review_v2, run one LLM review,
-then present recommendations one at a time with interrupt-before-next.
+PR review flow: pull PR via git-utils pr_review_v2, assemble context, then
+present recommendations one at a time. Like plan_interactive — no LLM inside
+the graph; Cursor's LLM (or the caller) generates the review from the context.
 
 Graph:
-    START -> pull_data -> review -> [interrupt] -> present_recommendation -> gate
-                                                         ^                      |
-                                                         +---- approved --------+
-    gate: approved -> next present_recommendation or END; abort -> END.
+    START -> pull_data -> assemble_review_context -> [interrupt]
+        -> (caller provides review content) -> gate_review (inject) -> present_recommendation
+        -> [interrupt] -> gate (approved/abort) -> present_recommendation or END
 
-Invoked from Cursor via pr_review_start(pr_url) and pr_review_resume(thread_id, feedback).
+Invoked from Cursor via pr_review_start(pr_url) and pr_review_resume(thread_id, content=..., feedback=...).
 """
 
 import os
@@ -19,8 +19,6 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.sqlite import SqliteSaver
-
-from .plan_auto_anthropic import chat as anthropic_chat
 
 # Repo root: my_ai_tools/agents/pr_review.py -> ../../.. = repo root
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -39,6 +37,9 @@ class PRReviewState(TypedDict):
     phase: str
     full_review_text: str
     current_recommendation_text: str
+    # Interactive: context for caller's LLM; caller sends back the review text
+    review_context_bundle: str
+    generated_review_content: str
 
 
 # ---------------------------------------------------------------------------
@@ -133,11 +134,6 @@ def load_pr_review_prompt() -> str:
     return "You are a Principal Machine Learning Engineer doing a rigorous code review."
 
 
-def generate_pr_review(system_prompt: str, user_content: str) -> str:
-    """Single LLM call for full PR review. Returns full model output (including ## Recommendations)."""
-    return anthropic_chat(system_prompt, user_content)
-
-
 def parse_recommendations(full_text: str) -> list[str]:
     """
     Parse a numbered list from a "## Recommendations" section.
@@ -195,15 +191,15 @@ def _pull_data(state: PRReviewState) -> dict[str, Any]:
         }
 
 
-def _review(state: PRReviewState) -> dict[str, Any]:
-    """Gather git context, load prompt, call LLM, parse recommendations."""
+def _assemble_review_context(state: PRReviewState) -> dict[str, Any]:
+    """Build context bundle for the caller's LLM. No LLM call inside the graph."""
     repo_path = state.get("repo_path") or ""
     base_branch = DEFAULT_BASE_BRANCH
     ctx = get_repo_context(repo_path, base_branch)
     if ctx.get("error"):
         return {
             "phase": "error",
-            "full_review_text": ctx["error"],
+            "review_context_bundle": "",
             "recommendations": [ctx["error"]],
         }
     system = load_pr_review_prompt()
@@ -216,19 +212,29 @@ def _review(state: PRReviewState) -> dict[str, Any]:
         "\n--- git log (optional) ---\n", ctx.get("log", ""),
     ]
     user_content = "".join(user_parts)
-    try:
-        full_text = generate_pr_review(system, user_content)
-    except Exception as e:
-        full_text = f"[LLM error: {e}]"
-    recommendations = parse_recommendations(full_text)
+    bundle = f"## System / role\n\n{system}\n\n## User / repo context\n\n{user_content}"
+    return {
+        "phase": "review",
+        "review_context_bundle": bundle,
+        "generated_review_content": "",
+    }
+
+
+def _gate_review(state: PRReviewState) -> dict[str, Any]:
+    """Inject caller-provided review content: parse recommendations and set state."""
+    content = (state.get("generated_review_content") or "").strip()
+    if not content:
+        return {}
+    recommendations = parse_recommendations(content)
     if not recommendations:
-        recommendations = [full_text]
+        recommendations = [content]
     return {
         "phase": "recommendation",
-        "full_review_text": full_text,
+        "full_review_text": content,
         "recommendations": recommendations,
         "current_index": 0,
         "current_recommendation_text": recommendations[0] if recommendations else "",
+        "generated_review_content": "",
     }
 
 
@@ -264,6 +270,13 @@ def _route_after_gate(state: PRReviewState) -> str:
     return "present_recommendation"
 
 
+def _route_after_gate_review(state: PRReviewState) -> str:
+    """Route: error -> END; else -> present_recommendation."""
+    if state.get("phase") == "error":
+        return "__end__"
+    return "present_recommendation"
+
+
 # ---------------------------------------------------------------------------
 # Graph construction
 # ---------------------------------------------------------------------------
@@ -271,13 +284,19 @@ def _route_after_gate(state: PRReviewState) -> str:
 def build_graph(checkpointer: SqliteSaver):
     workflow = StateGraph(PRReviewState)
     workflow.add_node("pull_data", _pull_data)
-    workflow.add_node("review", _review)
+    workflow.add_node("assemble_review_context", _assemble_review_context)
+    workflow.add_node("gate_review", _gate_review)
     workflow.add_node("present_recommendation", _present_recommendation)
     workflow.add_node("gate", _gate)
 
     workflow.add_edge(START, "pull_data")
-    workflow.add_edge("pull_data", "review")
-    workflow.add_edge("review", "present_recommendation")
+    workflow.add_edge("pull_data", "assemble_review_context")
+    workflow.add_edge("assemble_review_context", "gate_review")
+    workflow.add_conditional_edges(
+        "gate_review",
+        _route_after_gate_review,
+        {"present_recommendation": "present_recommendation", "__end__": END},
+    )
     workflow.add_edge("present_recommendation", "gate")
     workflow.add_conditional_edges(
         "gate",
@@ -287,7 +306,7 @@ def build_graph(checkpointer: SqliteSaver):
 
     return workflow.compile(
         checkpointer=checkpointer,
-        interrupt_before=["present_recommendation"],
+        interrupt_before=["gate_review", "gate"],
     )
 
 
@@ -301,7 +320,9 @@ def start_pr_review(
     thread_id: str,
     checkpointer: SqliteSaver,
 ) -> dict[str, Any]:
-    """Start the PR review flow. Runs pull_data and review, then pauses before first recommendation."""
+    """Start the PR review flow. Runs pull_data and assemble_review_context, then pauses.
+    Returns review_context_bundle for the caller's LLM to generate the review.
+    Caller then calls resume_pr_review(thread_id, content=<review text>) to submit it."""
     graph = build_graph(checkpointer)
     config = {"configurable": {"thread_id": thread_id}}
     initial: PRReviewState = {
@@ -313,6 +334,8 @@ def start_pr_review(
         "phase": "pull",
         "full_review_text": "",
         "current_recommendation_text": "",
+        "review_context_bundle": "",
+        "generated_review_content": "",
     }
     result = graph.invoke(initial, config=config)
     return result
@@ -321,12 +344,21 @@ def start_pr_review(
 def resume_pr_review(
     *,
     thread_id: str,
-    human_feedback: str,
+    content: str = "",
+    human_feedback: str = "",
     checkpointer: SqliteSaver,
 ) -> dict[str, Any]:
-    """Resume after user feedback. approved/next -> next recommendation; abort -> end."""
+    """Resume the PR review flow.
+    - content: the full review text (with ## Recommendations) from the caller's LLM; submit after start.
+    - human_feedback: approved/next/abort when stepping through recommendations."""
     graph = build_graph(checkpointer)
     config = {"configurable": {"thread_id": thread_id}}
-    graph.update_state(config, {"human_feedback": human_feedback})
+    update: dict[str, str] = {}
+    if content:
+        update["generated_review_content"] = content
+    if human_feedback:
+        update["human_feedback"] = human_feedback
+    if update:
+        graph.update_state(config, update)
     result = graph.invoke(None, config=config)
     return result

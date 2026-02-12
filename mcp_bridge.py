@@ -218,12 +218,13 @@ def plan_interactive_resume(thread_id: str, content: str = "", feedback: str = "
 @mcp.tool()
 def pr_review_start(pr_url: str) -> str:
     """
-    Start a PR review flow (pull PR locally, run review, show recommendations one at a time).
+    Start a PR review flow (like plan_interactive: no internal LLM).
 
-    Runs scripts/git-utils.sh pr_review_v2 to clone/fetch the PR, then runs the Principal ML
-    Engineer review prompt. Returns the first recommendation and a thread_id.
-    Call pr_review_resume with that thread_id and feedback 'approved' to get the next
-    recommendation, or 'abort' to stop.
+    Pulls the PR via git-utils, assembles repo context and prompt, then returns a
+    review_context_bundle. Use Cursor's LLM (or any LLM) to generate a full review
+    that ends with a "## Recommendations" numbered list, then call pr_review_resume
+    with thread_id and content=<that review text> to submit it and get recommendations
+    one at a time.
     """
     thread_id = str(uuid.uuid4())
     try:
@@ -233,44 +234,38 @@ def pr_review_start(pr_url: str) -> str:
             checkpointer=_checkpointer,
         )
         phase = result.get("phase", "")
-        recommendations = result.get("recommendations") or []
-        current_index = result.get("current_index", 0)
         repo_path = result.get("repo_path", "")
+        context_bundle = result.get("review_context_bundle", "")
         if phase == "error":
-            return (
-                f"PR review error: {result.get('full_review_text', 'Unknown error')}\n"
-                f"Thread ID: {thread_id}"
-            )
-        if not recommendations:
-            return (
-                f"No recommendations produced. Thread ID: {thread_id}\n"
-                f"Repo path: {repo_path}"
-            )
-        first = recommendations[current_index] if current_index < len(recommendations) else recommendations[0]
+            err = result.get("full_review_text") or (result.get("recommendations") or ["Unknown error"])[0]
+            return f"PR review error: {err}\nThread ID: {thread_id}"
         return (
             f"Thread ID: {thread_id}\n"
             f"Repo path: {repo_path}\n\n"
-            f"## Recommendation 1 of {len(recommendations)}\n\n{first}\n\n"
+            f"## Context for PR review (use Cursor's LLM to generate the review)\n\n"
+            f"{context_bundle}\n\n"
             f"---\n"
-            f"To get the next recommendation, call pr_review_resume with thread_id={thread_id!r} and feedback='approved'. "
-            f"Say feedback='abort' to stop."
+            f"Generate a full PR review ending with a **## Recommendations** section (numbered list). "
+            f"Then call pr_review_resume with thread_id={thread_id!r} and content=<your review text>."
         )
     except Exception as e:
         return f"PR review start error: {e}"
 
 
 @mcp.tool()
-def pr_review_resume(thread_id: str, feedback: str) -> str:
+def pr_review_resume(thread_id: str, content: str = "", feedback: str = "") -> str:
     """
-    Resume PR review after reviewing one recommendation.
+    Resume PR review.
 
-    - feedback='approved' (or 'next', 'continue'): show the next recommendation.
-    - feedback='abort': end the review.
-    - Other feedback: stay on the same recommendation (e.g. ask more questions in chat).
+    - content: the full review text (with ## Recommendations) from your LLM; use after
+      pr_review_start to submit the review and get recommendations one at a time.
+    - feedback: 'approved' (or 'next', 'continue') for the next recommendation;
+      'abort' to stop. Use when stepping through recommendations.
     """
     try:
         result = _resume_pr_review(
             thread_id=thread_id,
+            content=content or "",
             human_feedback=feedback or "",
             checkpointer=_checkpointer,
         )
@@ -308,4 +303,6 @@ def pr_review_resume(thread_id: str, feedback: str) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    # MCP stdio transport uses stdout for JSON-RPC. Disable the FastMCP banner to avoid
+    # emitting non-JSON output that can corrupt the protocol stream.
+    mcp.run(show_banner=False)

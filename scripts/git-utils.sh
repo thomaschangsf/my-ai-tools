@@ -41,7 +41,7 @@ show_help() {
     echo "  gu push_upstream                  - Push and set upstream"
     echo "  gu new_branch                    - Create new branch from latest master"
     echo "  gu pr_review <url> [--no-print-cd] - Clone/update repo for PR or branch URL"
-    echo "  gu pr_review_v2 <url> [--no-print-cd] - pr_review + fetch PR head ref + list changed files vs origin/master"
+    echo "  gu pr_review_v2 <url> [--no-print-cd] - PR or compare URL: clone/fetch, switch to PR head or branch, list changed files vs origin/master"
     echo "  gu status                        - Show detailed status"
     echo "  gu help                          - Show this help"
 }
@@ -588,8 +588,8 @@ pr_review_v2() {
         print_error "❌ No PR URL specified"
         print_info "💡 Usage: gu pr_review_v2 <url> [--no-print-cd]"
         print_info "💡 Example:"
-        print_info "   • gu pr_review_v2 https://git.soma.salesforce.com/a360/edc-python/pull/401"
-        print_info "   • eval \"$(gu pr_review_v2 https://git.soma.salesforce.com/a360/edc-python/pull/401)\""
+        print_info "   • gu pr_review_v2 https://github.com/owner/repo/pull/123"
+        print_info "   • gu pr_review_v2 https://github.com/owner/repo/compare/feature/security-readme"
         if [ "$quiet" = true ]; then
             exec 1>&3
             exec 3>&-
@@ -603,32 +603,53 @@ pr_review_v2() {
 
     # Step 0: Change to reviews directory (same as pr_review)
     print_info "📁 Step 0: Setting up review environment"
-    local reviews_dir="/Users/thomaschang/Documents/dev/git/reviews"
+    local reviews_dir="${REVIEWS_DIR:-/Users/thomaschang/Documents/dev/git/reviews}"
     if [ ! -d "$reviews_dir" ]; then
         print_info "Creating reviews directory: $reviews_dir"
         mkdir -p "$reviews_dir"
     fi
     print_info "Changing to reviews directory: $reviews_dir"
-    cd "$reviews_dir"
+    cd "$reviews_dir" || return 1
     print_status "✅ Now in reviews directory: $(pwd)"
     echo ""
 
-    # Step 1: Extract PR number and repository info (same as pr_review)
-    print_info "📋 Step 1: Parsing PR URL"
+    # Step 1: Extract PR number or branch and repository info
+    print_info "📋 Step 1: Parsing PR or compare URL"
     local clean_url
     clean_url=$(echo "$pr_url" | sed 's/^@//')
     print_info "🔧 Cleaned URL: $clean_url"
 
     local pr_number=""
+    local branch_name=""
     local repo_url=""
+    local url_type=""   # "pull" or "compare"
 
     if echo "$clean_url" | grep -q "/pull/"; then
-        print_info "🔍 Detected: Pull Request URL"
+        print_info "🔍 Detected: Pull Request URL (/pull/<num>)"
+        url_type="pull"
         pr_number=$(echo "$clean_url" | grep -o '/pull/[0-9]\+' | grep -o '[0-9]\+')
         repo_url=$(echo "$clean_url" | sed 's|/pull/[0-9][0-9]*.*||')
+    elif echo "$clean_url" | grep -q "/compare/"; then
+        print_info "🔍 Detected: Compare URL (/compare/<branch>)"
+        url_type="compare"
+        repo_url=$(echo "$clean_url" | sed 's|/compare/.*||')
+        # Branch: part after /compare/; if "base...head" use head
+        branch_name=$(echo "$clean_url" | sed 's|.*/compare/||' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if echo "$branch_name" | grep -q '\.\.\.'; then
+            branch_name=$(echo "$branch_name" | sed 's/.*\.\.\.//')
+        fi
+        if [ -z "$branch_name" ]; then
+            print_error "❌ Could not extract branch from compare URL"
+            if [ "$quiet" = true ]; then
+                exec 1>&3
+                exec 3>&-
+            fi
+            return 1
+        fi
     else
-        print_error "❌ pr_review_v2 only supports Pull Request URLs (needs /pull/<num>)"
-        print_info "💡 Use 'gu pr_review' for /tree/<branch> URLs"
+        print_error "❌ pr_review_v2 expects a Pull Request URL (/pull/<num>) or Compare URL (/compare/<branch>)"
+        print_info "💡 Example PR:   gu pr_review_v2 https://github.com/owner/repo/pull/123"
+        print_info "💡 Example compare: gu pr_review_v2 https://github.com/owner/repo/compare/feature/security-readme"
         if [ "$quiet" = true ]; then
             exec 1>&3
             exec 3>&-
@@ -648,7 +669,7 @@ pr_review_v2() {
         print_info "🔄 Normalized SSH repo URL (added .git): $repo_url"
     fi
 
-    if [ -z "$pr_number" ]; then
+    if [ "$url_type" = "pull" ] && [ -z "$pr_number" ]; then
         print_error "❌ Could not extract PR number from URL"
         if [ "$quiet" = true ]; then
             exec 1>&3
@@ -657,13 +678,37 @@ pr_review_v2() {
         return 1
     fi
 
-    print_info "✅ PR Number: $pr_number"
+    if [ "$url_type" = "pull" ]; then
+        print_info "✅ PR Number: $pr_number"
+    else
+        print_info "✅ Branch: $branch_name"
+    fi
     print_info "✅ Repository: $repo_url"
     echo ""
 
-    # Step 2: Clone/update the repo (same as pr_review)
+    # Step 2: Clone/update the repo
     print_info "📥 Step 2: Setting up repository"
-    local clone_dir="pr-review-$pr_number"
+    local clone_dir
+    local pr_branch
+    local fetch_cmd
+    local switch_cmd
+    local diff_ref    # ref to compare against base (e.g. origin/master...pr_branch)
+
+    if [ "$url_type" = "pull" ]; then
+        clone_dir="pr-review-$pr_number"
+        pr_branch="pr-${pr_number}"
+        fetch_cmd="git fetch origin \"refs/pull/${pr_number}/head:${pr_branch}\""
+        switch_cmd="git switch \"${pr_branch}\""
+        diff_ref="origin/master...\"${pr_branch}\""
+    else
+        # Sanitize branch for directory name: replace / with -
+        clone_dir="pr-review-branch-$(echo "$branch_name" | sed 's|/|-|g')"
+        pr_branch="$branch_name"
+        fetch_cmd="git fetch origin \"${branch_name}\""
+        switch_cmd="git switch \"${branch_name}\""
+        diff_ref="origin/master...HEAD"
+    fi
+
     if [ ! -d "$clone_dir" ]; then
         print_info "Cloning repository to $clone_dir..."
         print_info "🔧 Repository URL: $repo_url"
@@ -678,21 +723,18 @@ pr_review_v2() {
         print_status "✅ Repository cloned successfully"
     else
         print_info "Repository already exists, updating..."
-        cd "$clone_dir"
+        cd "$clone_dir" || return 1
         git fetch origin
-        cd ..
+        cd .. || return 1
     fi
     echo ""
 
     local repo_path="${reviews_dir}/${clone_dir}"
-    local pr_branch="pr-${pr_number}"
-    local fetch_cmd="git fetch origin \"refs/pull/${pr_number}/head:${pr_branch}\""
-    local switch_cmd="git switch \"${pr_branch}\""
 
     # If running as a command in print-cd mode: emit a single command suitable for eval.
     if [ "${BASH_SOURCE[0]}" = "${0}" ] && [ "$print_cd" = true ]; then
         exec 1>&3
-        echo "cd \"${repo_path}\" && git remote set-url origin \"${repo_url}\" && ${fetch_cmd} && ${switch_cmd} && git diff --name-only origin/master...\"${pr_branch}\""
+        echo "cd \"${repo_path}\" && git remote set-url origin \"${repo_url}\" && ${fetch_cmd} && ${switch_cmd} && git diff --name-only ${diff_ref}"
         exec 3>&-
         return 0
     fi

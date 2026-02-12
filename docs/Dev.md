@@ -1,5 +1,52 @@
 # Dev.md
+# 1 TLDR
+```bash
+# ------------------------------
+# Set up my-ai-tools
+# ------------------------------
+git clone https://github.com/thomaschangsf/my-ai-tools
 
+# Start MCP servver
+uv run mcp-bridge
+
+
+# ------------------------------
+# Global Cursor MCP config mcp.json
+# ------------------------------
+cd ~/.cursor/
+
+# Edit mcp.json; make sure the cd path below is the right directory
+"my-ai-tools": {
+	"type": "stdio",
+	"command": "bash",
+	"args": [
+		"-lc",
+		"cd \"/Users/chang/Documents/dev/git/ml/my-ai-tools\" && uv run mcp-bridge"
+	]
+}
+
+
+# ------------------------------
+# PR Review Workflow: Set up Clone Project
+# ------------------------------
+cd /Users/chang/Documents/dev/git/ml/my-ai-tools/tmp/reviews
+
+# cannot be agent
+cursor
+
+# Check mcp servier is up
+cmd + shift + p --> View: Open MCP Settings
+
+# Smoke test
+I want to use the MCP tool my-ai-tools.run_hello with input_text = "hi"
+
+
+I want to use the MCP tool pr_review_start with pr_url = https://github.com/thomaschangsf/openclaw-fortress/compare/feature/security-readme
+
+```
+
+
+# 2 Others
 ```bash
 # -------------------------------------------
 # Start/develop  my-ai-tools mcp server
@@ -43,24 +90,47 @@ plan_interactive_resume: OK
     For interactive: provide the next artifact (content="...") or feedback to re-issue context for the same phase.
 
 # -------------------------------------------
-# Use in any cursor proejct
+# Use in any cursor project
 # -------------------------------------------
+# The server must run from the my-ai-tools repo root (same as when you do:
+#   cd .../my-ai-tools && uv run mcp-bridge
+# So in Cursor you must use the wrapper script as the command; it cd's to the
+# repo root then runs `uv run mcp-bridge`. Do not use `uv run mcp-bridge` as
+# the command directly—Cursor would run it from the workspace dir (e.g. tmp/reviews)
+# and you get "No server info found".
 
-
-put this in ~/.cursor/mcp.json
+# Put this in ~/.cursor/mcp.json (use the absolute path to this repo's run_mcp_bridge.sh):
 {
   "mcpServers": {
     "my-ai-tools": {
       "type": "stdio",
-      "command": "bash",
-      "args": [
-        "-lc",
-        "cd \"/Users/thomaschang/Documents/dev/git/thomaschangsf/my-ai-tools\" && uv run mcp-bridge"
-      ]
+      "command": "/Users/chang/Documents/dev/git/ml/my-ai-tools/scripts/run_mcp_bridge.sh",
+      "args": []
     }
-
   }
 }
+
+# -------------------------------------------
+# Why is the MCP bridge not available?
+# -------------------------------------------
+# The bridge runs as a separate process. Cursor starts it via the command in ~/.cursor/mcp.json
+# and talks JSON-RPC over stdio. If the "command" path is correct (e.g. points to this
+# repo's scripts/run_mcp_bridge.sh), then:
+#
+# 1. Command must work: Running that command must succeed (uv, deps, mcp_bridge.py).
+#    Test: ./scripts/run_mcp_bridge.sh from this repo; it should sit waiting for stdin
+#    (no crash, no output to stdout).
+# 2. Cursor must load the server: Cursor only adds tools from MCP servers it successfully
+#    starts. If the server crashes on startup, no tools appear. Reload after changing
+#    mcp.json: Command Palette → "Developer: Reload Window".
+# 3. Which tools you see: In chat/agent, Cursor may expose only a subset of MCP servers
+#    to a given context. If my-ai-tools is connected but pr_review_start doesn't appear
+#    in the agent's tool list, the server may not be injected into this agent (e.g. some
+#    modes use only built-in MCPs like GitHub).
+#
+# Quick check: Command Palette → "MCP: Show connected servers" (or similar) to see
+# if my-ai-tools is connected. Then try "Use the MCP tool my-ai-tools.run_hello with
+# input_text = 'hi'" in chat.
 
 # How to use from cursor:
 Use the MCP tool my-ai-tools.run_hello with input_text = "hi"
