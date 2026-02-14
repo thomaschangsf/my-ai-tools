@@ -179,7 +179,7 @@ Human role: Approve (next) or abort between recommendations.
 
 - **4 nodes:** pull_data → review → present_recommendation → gate (loop or END).
 - **Data pull:** Runs `scripts/git-utils.sh pr_review_v2 <url>`, captures the one-line eval command from stdout, executes it in a subprocess so the repo is cloned/updated and on the PR branch. The workflow runs that command; the user's shell does not change unless they run it manually.
-- **Review:** In the cloned repo, runs `git status`, `git diff`, `git diff origin/<base>...HEAD`, loads `prompts/Prompt-PR-Review.md`, and calls the LLM (Anthropic) once. The model is asked to end with a **## Recommendations** numbered list, which is parsed into a list and shown one at a time.
+- **Review:** In the cloned repo, runs `git status`, `git diff`, `git diff origin/<base>...HEAD`, loads `prompt-vault/prompts/pr-review.md`, and calls the LLM (Anthropic) once. The model is asked to end with a **## Recommendations** numbered list, which is parsed into a list and shown one at a time.
 - **Interrupt:** `interrupt_before=["present_recommendation"]` so the graph pauses before each recommendation. `pr_review_resume(thread_id, feedback)` with `feedback='approved'` (or `'next'`, `'continue'`) advances to the next; `feedback='abort'` ends the flow.
 - **Env:** `REVIEWS_DIR` (default from git-utils), `BASE_BRANCH` (default `master`), `ANTHROPIC_API_KEY` for the review LLM.
 
@@ -397,8 +397,11 @@ my-ai-tools/
 │       ├── plan_interactive.py       # Interactive graph (LLM-agnostic)
 │       ├── pr_review.py              # PR review graph (git-utils + one-at-a-time recommendations)
 │       └── hello_world.py            # Test agent
-├── prompts/
-│   └── Prompt-PR-Review.md           # Principal ML Eng PR review prompt
+├── prompt-vault/
+│   ├── INDEX.md                      # One-line description + asks_for per prompt
+│   ├── _template.md                  # Scaffold for new prompts
+│   └── prompts/
+│       └── pr-review.md              # Principal ML Eng PR review prompt
 ├── scripts/
 │   ├── git-utils.sh                  # pr_review_v2: clone/fetch PR, emit eval command
 │   ├── plan_cli.py                   # Terminal CLI for interactive flow

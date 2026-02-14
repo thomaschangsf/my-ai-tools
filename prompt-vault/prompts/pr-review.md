@@ -1,15 +1,30 @@
-## AI Tools (Dev Notes)
+# Prompt: PR Review (Principal ML Engineer)
 
-### Prompt: Critique my uncommitted changes + branch diff vs base branch (AI runs git commands)
+**id:** `pr-review`  
+**tags:** code-review, PR, ML, principal-engineer, git-diff  
+**asks_for:** repo (or repo root path), base_branch (e.g. main/master), primary_goal_brief  
+**outputs:** Executive summary (5–10 bullets), uncommitted diff critique, branch-vs-base critique, Principal ML Eng PR checklist
+
+---
+
+## How to trigger
+
+- Prompt file is in **my-ai-tools**; the repo to review is usually **another folder**. You must say where to run git.
+- **If you're in the PR repo:** Add my-ai-tools to the workspace (File → Add Folder to Workspace) so you can @ this file. Then: *"Review this repo; base branch main. Goal: &lt;one line&gt;."*
+- **Or** give the repo path: *"Review repo at /path/to/clone; base main. Goal: &lt;one line&gt;."*
+
+---
+
+## Prompt
 
 You are a **Principal Machine Learning Engineer** doing a rigorous code review.
 
 ### Repo context
-- Repo: `edc-python` (monorepo with `inference/`, `training/`, `common/`)
-- Primary goal of this work (brief): <fill in>
+- **Repo root:** &lt;path to repo to review, or "this workspace"&gt;
+- **Primary goal:** &lt;fill in&gt;
 
 ### What you should do first (you run these commands)
-Run these commands in the repo root and use their outputs as your source of truth:
+Run these in the **repo root** above (not where this prompt file lives). Use their output as source of truth:
 
 - **Working tree / uncommitted changes**
 
@@ -21,7 +36,7 @@ git diff
 - **Branch vs base branch**
 
 ```bash
-# Use main if that’s the repo default; override via BASE_BRANCH as needed.
+# Use main if that's the repo default; override via BASE_BRANCH as needed.
 # Prefer origin/<base> to avoid stale local branches (e.g., local master behind origin/master).
 git diff origin/${BASE_BRANCH:-master}...HEAD
 ```
@@ -68,11 +83,9 @@ Give a checklist grouped by:
   - **Uncommitted diff critique**
   - **Branch vs base branch critique**
   - **Principal ML Eng PR checklist**
-- Quote short snippets from the diffs you generated (don’t invent code).
+- Quote short snippets from the diffs you generated (don't invent code).
 - Be direct; assume production constraints; prefer minimal-risk recommendations.
 - Write output to current window
 
 ### Clarifying questions
 Ask up to **3** questions only if necessary; otherwise proceed with best-effort review.
-
-

@@ -21,8 +21,11 @@ my-ai-tools/
 │       ├── plan_auto_anthropic.py  # Anthropic HTTP LLM helpers for auto flow
 │       ├── plan_interactive.py     # Interactive flow (caller provides content)
 │       └── pr_review.py            # PR review flow (git-utils + one recommendation at a time)
-├── prompts/
-│   └── Prompt-PR-Review.md         # Principal ML Eng PR review prompt
+├── prompt-vault/
+│   ├── INDEX.md                    # One-line description + asks_for per prompt
+│   ├── _template.md                # Scaffold for new prompts
+│   └── prompts/
+│       └── pr-review.md            # Principal ML Eng PR review prompt
 ├── scripts/
 │   ├── git-utils.sh                # pr_review_v2: clone/fetch PR, emit eval command
 │   ├── verify_agents.py            # Master verification (hello + interactive + auto)
@@ -176,7 +179,7 @@ Cross-session: LangGraph checkpoints persist to SQLite, so you can resume with t
 
 ### PR review flow
 
-Runs `scripts/git-utils.sh pr_review_v2 <PR URL>` to clone/fetch the PR locally (the workflow executes the emitted command in a subprocess; your shell does not change). Then runs one LLM review using `prompts/Prompt-PR-Review.md` and presents recommendations one at a time. Call `pr_review_resume` with `feedback='approved'` for the next recommendation or `feedback='abort'` to stop. Requires `ANTHROPIC_API_KEY` for the review LLM.
+Runs `scripts/git-utils.sh pr_review_v2 <PR URL>` to clone/fetch the PR locally (the workflow executes the emitted command in a subprocess; your shell does not change). Then runs one LLM review using `prompt-vault/prompts/pr-review.md` and presents recommendations one at a time. Call `pr_review_resume` with `feedback='approved'` for the next recommendation or `feedback='abort'` to stop. Requires `ANTHROPIC_API_KEY` for the review LLM.
 
 ### Terminal CLI
 

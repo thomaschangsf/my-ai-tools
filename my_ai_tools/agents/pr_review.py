@@ -22,7 +22,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 
 # Repo root: my_ai_tools/agents/pr_review.py -> ../../.. = repo root
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_PROMPT_PATH = _REPO_ROOT / "prompts" / "Prompt-PR-Review.md"
+_PROMPT_PATH = _REPO_ROOT / "prompt-vault" / "prompts" / "pr-review.md"
 _SCRIPT_PATH = _REPO_ROOT / "scripts" / "git-utils.sh"
 DEFAULT_REVIEWS_DIR = os.environ.get("REVIEWS_DIR", "/Users/thomaschang/Documents/dev/git/reviews")
 DEFAULT_BASE_BRANCH = os.environ.get("BASE_BRANCH", "master")
@@ -125,10 +125,13 @@ def get_repo_context(repo_path: str, base_branch: str = DEFAULT_BASE_BRANCH) -> 
 
 
 def load_pr_review_prompt() -> str:
-    """Load prompts/Prompt-PR-Review.md content."""
+    """Load prompt-vault/prompts/pr-review.md; use content under ## Prompt if present."""
     try:
         if _PROMPT_PATH.exists():
-            return _PROMPT_PATH.read_text(encoding="utf-8")
+            text = _PROMPT_PATH.read_text(encoding="utf-8")
+            if "## Prompt" in text:
+                text = text.split("## Prompt", 1)[1].strip()
+            return text
     except OSError:
         pass
     return "You are a Principal Machine Learning Engineer doing a rigorous code review."
