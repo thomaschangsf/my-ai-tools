@@ -120,3 +120,27 @@ Maintain a small personal “prompt DB” (~20 prompts) that works **across proj
 - If you feel friction after 1–2 weeks, add **Next step B** (MCP guided retrieval).
 - Add **Next step C** only if you often work in terminal contexts.
 
+---
+
+## Current state: using the prompt-vault via PR review (example)
+
+This is the current “happy path” for using `my-ai-tools` + the prompt-vault to drive a PR review **in a different review directory** (so the review workspace is separate from the `my-ai-tools` repo).
+
+### Example flow — trigger a code review in a separate review directory
+
+```bash
+cd /Users/thomaschang/Documents/dev/git/reviews
+
+gu pr_review_v2 https://git.soma.salesforce.com/a360/edc-python/pull/488
+
+# Copy the command at end of run
+
+cursor .
+```
+
+Then in Cursor:
+
+- **Add the tools repo to the current workspace**: `Cursor -> File -> Add Folder To Workspace -> my-ai-tools`
+- **Apply the prompt-vault review prompt in chat**: “Use `@pr-review.md` on this PR”
+
+
