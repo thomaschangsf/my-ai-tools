@@ -1,5 +1,24 @@
 # Dev.md
 # 1 TLDR
+
+### How to Trigger Prompt form prompt-vault
+```bash
+cd /Users/thomaschang/Documents/dev/git/reviews
+
+gu pr_review_v2 https://git.soma.salesforce.com/a360/edc-python/pull/488
+
+# Copy the command at end of run
+
+cursor .
+
+Cursor --> File --> Add Folder To Workspace --> my-ai-tools
+
+Chat: Use @pr-review.md on this PR
+```
+
+
+
+
 ```bash
 # ------------------------------
 # Set up my-ai-tools
