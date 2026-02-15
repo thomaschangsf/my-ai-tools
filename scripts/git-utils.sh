@@ -734,7 +734,7 @@ pr_review_v2() {
     # If running as a command in print-cd mode: emit a single command suitable for eval.
     if [ "${BASH_SOURCE[0]}" = "${0}" ] && [ "$print_cd" = true ]; then
         exec 1>&3
-        echo "cd \"${repo_path}\" && git remote set-url origin \"${repo_url}\" && ${fetch_cmd} && ${switch_cmd} && git diff --name-only ${diff_ref}"
+        echo "cd \"${repo_path}\" && git remote set-url origin \"${repo_url}\" && ${fetch_cmd} && ${switch_cmd} && git diff --name-only ${diff_ref} && ln -s \"\$DIR_AI_TOOLS\" ."
         exec 3>&-
         return 0
     fi
@@ -760,6 +760,7 @@ pr_review_v2() {
         echo "   git remote set-url origin \"${repo_url}\""
         echo "   ${fetch_cmd}"
         echo "   ${switch_cmd}"
+        echo "   ln -s \"\$DIR_AI_TOOLS\" ."
         if [ "$quiet" = true ]; then
             exec 1>&3
             exec 3>&-
