@@ -35,7 +35,7 @@ my-ai-tools/
 ├── mcp_bridge.py              # MCP server entry point (Cursor)
 ├── docs/
 │   ├── Architecture.md        # Architecture, diagrams, rationale
-│   └── Dev.md                 # Developer cookbook & worked examples
+│   └── Workflows.md            # Workflows & setup
 ├── specs/
 ├── pyproject.toml
 └── README.md
@@ -44,7 +44,7 @@ my-ai-tools/
 ## Design: Two orthogonal axes
 
 > Full architecture, diagrams, and rationale: [docs/Architecture.md](docs/Architecture.md)
-> Developer cookbook and worked examples: [docs/Dev.md](docs/Dev.md)
+> Workflows and setup: [docs/Workflows.md](docs/Workflows.md)
 
 The planning system separates **control flow** from **LLM backend**:
 

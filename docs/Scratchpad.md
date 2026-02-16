@@ -1,31 +1,63 @@
 
 
-# 1 Design PR Review Workflow
-- Original prompt
 
+
+
+# 2 Multiple Agents
+- Multi-agent = separate **prompts** (same node, swap role) and/or separate **nodes** (distinct steps in a graph).
+- Ways to orchestrate:
+  - **LangGraph:** Conditional steps, interrupts, resume, shared state. Use when you need pause-between-steps or persistence.
+  - **Cursor skill:** Instruction playbook (do Step 1, then Step 2). One run, no built-in pause or state.
+  - **Cursor chat:** Human drives the sequence; no automation.
+  - **Scripts (e.g. Python/shell):** Call tools or flows in sequence; each tool owns its own state.
+
+## Art of good multi-agent prompts
+- **Role + scope:** One clear persona and one job (e.g. "Code Critic", not "review and also suggest tests" unless that's one coherent task).
+- **Inputs explicit:** Say exactly what this agent receives (e.g. "You are given: repo path, base branch, primary goal").
+- **Output shape:** Specify format so the next node or human can parse (e.g. "End with ## Recommendations as a numbered list").
+- **Handoff:** If there's a next step, say what the output is for (e.g. "Each recommendation will be shown one at a time; user may approve or ask follow-up").
+
+### Example: Code-Critique agent
+- **Role:** Principal ML Engineer performing a code critique (not full PR process—focused on correctness, clarity, and maintainability).
+- **Inputs:** Code snippet or diff, optional context (file path, ticket goal). No git commands—caller provides the text.
+- **Output:** Structured critique:
+  1. **Summary** (2–3 sentences).
+  2. **Critical issues** (must-fix): list with location + fix suggestion.
+  3. **Suggestions** (nice-to-have): same format.
+  4. **Praise** (what’s good): brief.
+- **Handoff:** Output is consumed by a "present one finding at a time" node or by the user directly; no follow-up agent required unless you add a "Fix proposer" step.
+
+## Self Correction Agent Code/Review Workflow
+
+Triggering the self-correction workflow in Cursor
+
+### Option 1: Iterative
+1. First pass (from spec)
+In chat: @agent-write-code-from-spec
+Say: repo (or “this workspace”), path to design spec, and optional target path.
+Agent writes code, runs checks, then suggests running agent-check-code.
+
+2. Check
+In chat: @agent-check-code
+Say: repo, design spec (path or one line), and optional local scope (unstaged/staged/committed/untracked).
+Agent prints ## Recommendations for agent-write-code-from-spec.
+
+3. Next pass (from check)
+In chat: @agent-write-code-from-spec
+Paste the ## Recommendations block (or the full check output).
+Agent fixes items, reports Addressed/Deferred, then suggests running agent-check-code again.
+
+4. Repeat
+Re-run agent-check-code (step 2) on the same repo/spec/scope, then paste the new Recommendations into agent-write-code-from-spec (step 3) until you’re satisfied or there are no more actionable items.
+
+
+### Option 2: Via One Uber Prompt
 ```bash
-Use cursor skill @/Users/chang/.cursor/skills/ml-engineer-planning/SKILL.md for this chat.
+   @agent-wf-code-check @agent-write-code-from-spec @agent-check-code
 
-I want to design a langgraph workflow to do pr review
-
-1. We have a similar data pull flow like plan_auto_start and plan_auto_resume; I will call this workflow from cursor
-2. Use @scripts/git-utils.sh  pr_review_v2 <Pull request http address> to pull the pr local to directory.  Execute the last command outputed on the output terminal, which changes to the right branch
-3. Apply @prompt-vault/prompts/pr-review.md to do a PR review.
-4. Issue 1 recommendation at a time; show the most important one first, user may ask more questions.  
-5. Ask user for approval before going to the next recommendation
-6. This continues until users says abort or all recommendation have been exhausted
-
-Divide this workflow into pr_review_start and pr_review_resume
-```
-
-- To trigger in Cursor
-```bash
-Terminal
-
-cd <PR reviews directory>
-
-agent
-
-Use the MCP tool pr_review_start with pr_url = ‘https://github.com/owner/repo/pull/123
-
+   Run the self-correction workflow:
+   - Repo: this workspace
+   - Spec: specs/data-loader.md
+   - Target path: src/loaders/ #OPTIONAL
+   - Max iterations: 3
 ```
