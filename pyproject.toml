@@ -18,6 +18,9 @@ dev = [
     "pytest",
     "ruff",
 ]
+ui = [
+    "streamlit",
+]
 
 [project.scripts]
 check = "my_ai_tools.cli:check"
@@ -25,6 +28,7 @@ tests = "my_ai_tools.cli:tests"
 notebook = "my_ai_tools.cli:jupyter"
 ollama-serve = "my_ai_tools.cli:ollama_serve"
 mcp-bridge = "my_ai_tools.cli:mcp_bridge"
+agent-inspector = "my_ai_tools.apps.execution_inspector:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -36,3 +40,6 @@ line-length = 100
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "ollama: requires local Ollama running and OLLAMA_MODEL pulled",
+]

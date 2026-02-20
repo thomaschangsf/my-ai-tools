@@ -127,6 +127,23 @@ uv sync --extra dev
 - **`uv run ollama-serve`** — Start Ollama locally if not already running.
 - **`uv run mcp-bridge`** — Start the MCP bridge server.
 - **`uv run python scripts/plan_cli.py "task" /path`** — Terminal planning CLI.
+- **`uv run agent-inspector`** — Start the Streamlit Agent Inspector UI (select a framework + inspect messages/summary/trace).
+
+### Agent Inspector UI
+
+```bash
+# Install Streamlit UI deps
+uv sync --extra ui
+
+# Run the inspector
+uv run agent-inspector
+```
+
+Fallback: if the `uv run agent-inspector` wrapper ever breaks due to Streamlit CLI/runtime quirks:
+
+```bash
+uv run python -m streamlit run my_ai_tools/apps/execution_inspector.py
+```
 
 ## MCP: Global Agents (Cursor)
 
