@@ -113,21 +113,6 @@ curl http://localhost:1234/api/v1/chat \
 * **Port:** Ensure it is running on port `1234`.
 * **CORS:** Toggle **CORS** to `ON` in the server settings.
 
-### 2. Create a Public Tunnel (Required)
-
-Cursor requires an `https` endpoint to communicate with its backend. Use **ngrok** to expose your local port:
-
-* Run the following in your terminal:
-```bash
-brew install ngrok
-ngrok config add-authtoken 39u673BUKTNFQ3LgNn4DfJmfYeH_ZochggrNxSbfzqvQJoXR
-
-ngrok http 1234
-
-```
-
-
-* **Copy the URL:** Look for the `Forwarding` address (e.g., `https://xxxx-xxxx.ngrok-free.app`).
 
 ### 3. Configure Cursor Settings
 
