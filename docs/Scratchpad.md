@@ -1,11 +1,12 @@
 
 
 # 1 Ideas
-- How can cursor idea auto-complete a prompt template? for my uber code-review agent.
-- Paper to Code agent
+- How can cursor idea auto-complete a prompt template? ex: my uber code-review agent
 - Spec Review/Quality
+- Paper to Code agent
 - Eval prompts so my prompt-vault has no regression
-- Interview agent with langgraph + persistence so it knows what to ask
+- Interview agent with langgraph + persistence so it knows what to ask; a daily agent
+- Git bug agent
 
 
 # 2 Multiple Agents
