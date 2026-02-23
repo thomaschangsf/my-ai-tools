@@ -85,6 +85,7 @@ Give a checklist grouped by:
   - **Principal ML Eng PR checklist**
 - Quote short snippets from the diffs you generated (don't invent code).
 - Be direct; assume production constraints; prefer minimal-risk recommendations.
+- Show the recommenation with original code and recommended change.
 - Write output to current window
 
 ### Clarifying questions
