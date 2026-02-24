@@ -19,6 +19,15 @@ Chat: Use @pr-review.md on this PR
 ## 1.2 Agentic Dev/Review Cycle
 - WIP: See [[Scratchpad.md]]
 
+## 1.3 Convert PDF to MD
+- See [[README]]
+```bash
+
+# For more flags, read README
+TORCH_DEVICE=cpu uv run pdf2md convert \ /Users/thomaschang/Documents/dev/git/thomaschangsf/compendium/thinking/2_agents/paper/skills.pdf \
+ --output /Users/thomaschang/Documents/dev/git/thomaschangsf/compendium/thinking/2_agents/paper/output
+ 
+```
 
 # 2 Setup
 ```bash
