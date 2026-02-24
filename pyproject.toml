@@ -21,6 +21,12 @@ dev = [
 ui = [
     "streamlit",
 ]
+pdf2md = [
+    "marker-pdf[full]",
+    "typer",
+    "requests",
+    "beautifulsoup4",
+]
 
 [project.scripts]
 check = "my_ai_tools.cli:check"
@@ -29,6 +35,7 @@ notebook = "my_ai_tools.cli:jupyter"
 ollama-serve = "my_ai_tools.cli:ollama_serve"
 mcp-bridge = "my_ai_tools.cli:mcp_bridge"
 agent-inspector = "my_ai_tools.apps.execution_inspector:main"
+pdf2md = "my_ai_tools.pdf2md.cli:app"
 
 [build-system]
 requires = ["hatchling"]

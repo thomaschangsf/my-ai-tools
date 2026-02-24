@@ -128,6 +128,52 @@ uv sync --extra dev
 - **`uv run mcp-bridge`** — Start the MCP bridge server.
 - **`uv run python scripts/plan_cli.py "task" /path`** — Terminal planning CLI.
 - **`uv run agent-inspector`** — Start the Streamlit Agent Inspector UI (select a framework + inspect messages/summary/trace).
+- **`uv run pdf2md convert <input> [--output <dir>]`** — Convert a PDF to Markdown (requires `uv sync --extra pdf2md`).
+
+### pdf2md
+
+```bash
+# Install pdf2md deps
+uv sync --extra pdf2md
+
+# Convert a PDF to Markdown
+TORCH_DEVICE=cpu uv run pdf2md convert /path/to/paper.pdf --output /path/to/output/
+
+# Example
+TORCH_DEVICE=cpu uv run pdf2md convert \
+  /Users/thomaschang/Documents/dev/git/thomaschangsf/compendium/thinking/2_agents/paper/skills.pdf \
+  --output /Users/thomaschang/Documents/dev/git/thomaschangsf/compendium/thinking/2_agents/paper/output
+```
+
+**Backends** (`--backend`):
+
+| Backend | Status | When to use |
+|---|---|---|
+| `marker` (default) | Implemented | General-purpose; uses local ML models (~1 GB downloaded on first run). Works offline, good for most PDFs. |
+| `mineru` | Not yet implemented (Phase 3) | Planned alternative backend. |
+
+```bash
+# Marker (default — no flag needed)
+TORCH_DEVICE=cpu uv run pdf2md convert paper.pdf
+
+# Explicit backend selection
+TORCH_DEVICE=cpu uv run pdf2md convert paper.pdf --backend marker
+
+# Check which backends are installed
+uv run pdf2md backends
+```
+
+**LLM-enhanced conversion** (`--use-llm`): Pass an LLM provider to improve accuracy for complex layouts, equations, and tables. Supported providers: `ollama`, `gemini`, `openai`, `claude`, `azure`. Ollama runs locally; the others require an API key in the environment (e.g. `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`).
+
+```bash
+# Use Gemini for better equation/table extraction
+GOOGLE_API_KEY="..." TORCH_DEVICE=cpu uv run pdf2md convert paper.pdf --use-llm gemini
+
+# Use local Ollama (no API key needed)
+TORCH_DEVICE=cpu uv run pdf2md convert paper.pdf --use-llm ollama
+```
+
+Other options: `--force-ocr` (scanned PDFs or inline math), `--page-range "0,5-10"`, `--llm-model`, `--llm-base-url`. Run `uv run pdf2md convert --help` for details.
 
 ### Agent Inspector UI
 

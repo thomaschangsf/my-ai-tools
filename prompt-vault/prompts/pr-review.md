@@ -83,9 +83,13 @@ Give a checklist grouped by:
   - **Uncommitted diff critique**
   - **Branch vs base branch critique**
   - **Principal ML Eng PR checklist**
-- Quote short snippets from the diffs you generated (don't invent code).
+- **Code references:** When citing code in recommendations, make it easy to locate in *both* the local repo and a GitHub PR diff view:
+  1. **File path** — always state the full repo-relative file path (e.g. `inference/core/.../foo.py`).
+  2. **Anchor by function/class** — name the enclosing function or class so the reader can jump to it (e.g. "in `compute_prescriptions`, inside the `for prescribable_feature` loop").
+  3. **Quote a distinctive snippet** — include a short (3–8 line) verbatim excerpt of the *actual source code* (read the file, don't copy from diff output). Pick lines that are unique enough to Ctrl-F in the diff.
+  4. **Line numbers are secondary** — you may add `(≈ line 392)` as a hint, but never rely on line numbers alone; GitHub diff view and local files can drift. The snippet + function name must be sufficient on their own.
 - Be direct; assume production constraints; prefer minimal-risk recommendations.
-- Show the recommenation with original code and recommended change.
+- Show the recommendation with original code and recommended change.
 - Write output to current window
 
 ### Clarifying questions

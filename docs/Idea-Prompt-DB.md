@@ -17,6 +17,9 @@ Maintain a small personal “prompt DB” (~20 prompts) that works **across proj
 
 ### 2) MCP (my-ai-tools) persistence (prompt DB as a tool)
 
+cd /Users/thomaschang/Documents/dev/git/thomaschangsf/my-ai-tools
+TORCH_DEVICE=cpu uv run pdf2md convert /Users/thomaschang/Documents/dev/git/thomaschangsf/compendium/thinking/2_agents/paper/skills.pdf --output /Users/thomaschang/Documents/dev/git/thomaschangsf/compendium/thinking/2_agents/paper/output 
+
 - **Store**: Prompts/metadata in a persisted store (e.g., SQLite or files managed by the MCP server).
 - **Trigger**: Call MCP tools like `list_prompts`, `get_prompt(id)`, `render_prompt(id, params=...)`.
 - **Best for**: Guided retrieval (IDs, tags, recency), and returning “required params” before the prompt.

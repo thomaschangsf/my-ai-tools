@@ -59,7 +59,7 @@
 - **"Lost in the Middle" (Attention Dilution):** As the loop grows, the agent’s original instructions (Primacy) and the most recent findings (Recency) stay sharp, but the crucial evidence it found in Step 3 or 4 gets buried in the "middle," leading the agent to repeat itself or forget key details.
 - **Error Propagation:** If a tool provides a "noisy" or incorrect observation, the agent’s next "Thought" will be based on that bad data. Without a separate "Critic" (like in the **Reflexion** pattern), the agent can spiral into a "loop of death" trying to fix an error it doesn't understand.
 - **High Latency:** Because it is a sequential, "stop-and-think" loop, it can feel slow. The agent cannot act until it has finished its "Thought," and it cannot think until it has finished its "Observation."
-## 2.2 Plan-and-Execute**
+## 2.2 Plan-and-Execute
 Instead of "thinking and acting" one step at a time, the agent creates a full multi-step roadmap first, then executes it piece by piece.
 - **How it works:** 1. **Planner:** Generates a list of 5 steps.
     2. **Executor:** Performs Step 1, then Step 2, etc.
