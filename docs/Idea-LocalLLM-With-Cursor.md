@@ -7,7 +7,9 @@ Here is a concise, step-by-step guide you can paste into your notes or share.
 
 ```bash
 # Start up LM Studio daemon + backend
-lms daemon up
+Start LM Studio App or lms daemon up
+
+# download the model from lm studio
 
 lms unload google/gemma-3-4b
 lms load google/gemma-3-4b
