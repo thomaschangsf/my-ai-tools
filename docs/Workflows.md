@@ -16,10 +16,7 @@ Cursor --> File --> Add Folder To Workspace --> my-ai-tools
 Chat: Use @pr-review.md on this PR
 ```
 
-## 1.2 Agentic Dev/Review Cycle
-- WIP: See [[Scratchpad.md]]
-
-## 1.3 Convert PDF to MD
+## 1.2 Convert PDF to MD
 - See [[README]]
 ```bash
 
@@ -28,6 +25,14 @@ TORCH_DEVICE=cpu uv run pdf2md convert \ /Users/thomaschang/Documents/dev/git/th
  --output /Users/thomaschang/Documents/dev/git/thomaschangsf/compendium/thinking/2_agents/paper/output
  
 ```
+
+## 1.3 Convert MarkDown to RemNote
+```bash
+@prompt-vault/prompts/learn-convert-to-remnote-v2.md on this file /Users/chang/Documents/dev/git/foundation/compendium/thinking/2_agents/agents_F.P.C.Q.md . Save remnote to tmp/
+```
+
+## 1.4 Agentic Dev/Review Cycle
+- WIP: See [[Scratchpad.md]]
 
 # 2 Setup
 ```bash
