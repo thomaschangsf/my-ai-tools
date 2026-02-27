@@ -49,9 +49,7 @@ Use only valid RemNote import syntax:
   - Good: `Atomic Reasoning — When :: During the "Thinking Mode"...`
   - Bad: `Component :: LangGraph` (component of what?)
   - Good: `Orchestration Layer — Component :: LangGraph`
-  - For table-derived cards, rephrase property names as questions when possible:
-  - Bad: `Modular/reusable :: Prompts: ×; RAG: ✓; ...`
-  - Good: `Which augmentation techniques are modular/reusable? :: RAG, Tools, and Skills (not Prompts).`
+  - For table-derived cards, see the Table strategy section below.
 
 ### 3) Extraction heuristics — what to look for
 
@@ -78,11 +76,18 @@ If the source already organizes content under its own headers (e.g., "Facts," "Q
 - **Definitions: 1–2 sentences max.** Trim filler but keep the author's phrasing intact.
 - **No filler.** Strip hedging ("it is worth noting that"), conversational padding ("as we saw earlier"), and redundant qualifiers. Do not strip substantive clauses.
 - **Concrete over abstract.** Include a single short example only when it genuinely clarifies the definition.
-- **Tables:** Preserve all columns. Convert each row into a parent concept with one nested `::` bullet per column. Prioritize analogies and examples — they aid recall.
+- **Tables — contrast-pair cloze (text-based table occlusion):** Use different strategies depending on the table type:
+  - **Side-by-side comparisons** (e.g., "LangGraph vs Harbor"): Create one card per row using contrast-pair cloze. Put both sides in the answer with `{{cloze}}` on both values. The learner sees the dimension name and must recall both sides.
+    - Example: `LangGraph vs Harbor — Philosophy :: LangGraph: {{Graph}} (Nodes/Edges); Harbor: {{Harness}} (Sandbox/Skills).`
+  - **NxM feature matrices** (e.g., comparing 4 techniques across 4 features): Create one card per row as a question that highlights what is distinctive. Use `{{cloze}}` on the key differentiator.
+    - Example: `Which augmentation techniques provide procedural guidance? :: Only {{Skills}} (Prompts: limited; RAG and Tools: none).`
+  - **Multi-column attribute tables** (e.g., Layer / Component / Analogy / Example): Keep as self-contained concept-per-cell cards. These describe, not compare.
+    - Example: `Orchestration Layer — Analogy :: The {{Project Manager}} (e.g., "Ensure this PR is safe to merge.").`
+  - In all cases, preserve all columns and prioritize analogies and examples.
 
 ### 6) Example
 
-**Input markdown:**
+**Example 1 — Prose + attribute table:**
 
 ```markdown
 ## Gradient Descent
@@ -99,32 +104,71 @@ It's like turning the steering wheel — a small rate means gentle turns.
 | Mini-batch       | Uses a subset     | Balances speed & noise |
 ```
 
-**Output RemNote:**
+Output:
 
 ```markdown
-# Gradient Descent
-
-## Facts
-
 - Gradient Descent :: An optimization algorithm used to minimize a {{loss function}} by computing the gradient and updating parameters in the opposite direction (Ruder, 2016).
 	- Gradient Descent — Learning Rate :: Controls the {{step size}} of parameter updates — like turning the steering wheel; a small rate means gentle turns.
 	- Gradient Descent — Variants
-		- Batch — Update Rule :: Uses the {{full dataset}}.
-		- Batch — Trade-off :: Stable but {{slow}}.
-		- SGD — Update Rule :: Uses {{one sample}}.
-		- SGD — Trade-off :: Fast but {{noisy}}.
-		- Mini-batch — Update Rule :: Uses a {{subset}}.
-		- Mini-batch — Trade-off :: Balances {{speed}} and noise.
+		- Batch :: Update rule: uses the {{full dataset}}. Trade-off: stable but {{slow}}.
+		- SGD :: Update rule: uses {{one sample}}. Trade-off: fast but {{noisy}}.
+		- Mini-batch :: Update rule: uses a {{subset}}. Trade-off: balances {{speed}} and noise.
 ```
 
-### 7) Fidelity verification
+**Example 2 — Side-by-side comparison table (contrast-pair cloze):**
 
-After generating the remnote file, re-read both the source and the output. Perform the following checks:
+```markdown
+| Feature      | LangGraph                        | Harbor                              |
+|--------------|----------------------------------|-------------------------------------|
+| Primary Goal | Orchestration: logic and flow    | Evaluation & Skills: procedural knowledge |
+| Philosophy   | Agent is a Graph (Nodes/Edges)   | Agent is a Harness (Sandbox/Skills) |
+| Analogy      | The Script of a play             | The Stage and the Manuals           |
+```
+
+Output:
+
+```markdown
+- LangGraph vs Harbor — Primary Goal :: LangGraph: {{Orchestration}} (logic and flow); Harbor: {{Evaluation & Skills}} (procedural knowledge).
+- LangGraph vs Harbor — Philosophy :: LangGraph: agent is a {{Graph}} (Nodes/Edges); Harbor: agent is a {{Harness}} (Sandbox/Skills).
+- LangGraph vs Harbor — Analogy :: LangGraph: the {{Script}} of a play; Harbor: the {{Stage}} and the Manuals.
+```
+
+**Example 3 — NxM feature matrix (distinctive-feature question):**
+
+```markdown
+|                      | Prompts | RAG | Tools | Skills |
+|----------------------|---------|-----|-------|--------|
+| Procedural guidance  | Limited | ×   | ×     | ✓      |
+| Executable resources | ×       | ×   | ✓     | ✓      |
+```
+
+Output:
+
+```markdown
+- Which augmentation techniques provide procedural guidance? :: Only {{Skills}} (Prompts: limited; RAG and Tools: none).
+- Which augmentation techniques have executable resources? :: {{Tools}} and {{Skills}} (not Prompts or RAG).
+```
+
+### 7) Deduplication
+
+After generating cards, scan for duplicates before writing the file. Apply these five rules in order:
+
+1. **Summary vs detail.** When the same fact appears in a summary table and a detailed prose section, keep only the detailed version (it is a superset). Merge any unique information from the summary (e.g., an analogy) into the detailed card.
+2. **Inverse pairs.** When two cards are logical inverses of each other (card A's question is card B's answer and vice versa), keep the one with richer context in its answer. Delete the other.
+3. **First-occurrence ownership.** When the same atomic fact appears across multiple sections, create a card only where the fact is **first introduced** in the source. Later sections that reference it use the fact as supporting context within other cards, not as a new standalone card.
+4. **Non-discriminating table rows.** Skip table rows where all values are identical (e.g., all four techniques share the same property). There is nothing distinctive to recall.
+5. **Complementary pair merge.** When two cards are "When X?" and "When not X?" (or "Use A" and "Use B" for the same decision), merge into a single card that tests the distinction boundary.
+
+Report dedup results in the verification: number of cards removed and which rule applied.
+
+### 8) Fidelity verification
+
+After deduplication, re-read both the source and the output. Perform the following checks:
 
 1. **Traceability.** For each card, identify the source passage it came from. If a card cannot be traced to a specific sentence, bullet, or table cell in the source, **delete it**.
-2. **Completeness.** Check for substantive content in the source that was not converted into any card. List any omissions.
+2. **Completeness.** Check for substantive content in the source that was not converted into any card (excluding content removed by dedup rules). List any omissions.
 3. **Accuracy.** Compare the wording of each card against its source passage. Flag any card where the meaning shifted during compression — a dropped clause, a softened claim, or a generalized specific.
-4. **Tables.** Verify every column from every source table appears in the output. If a column was dropped, add it back.
+4. **Tables.** Verify every column from every source table appears in the output (unless the entire row was removed by dedup rule 4). If a column was dropped, add it back.
 5. **Citations.** Verify all source attributions (author, year, framework name) appear in the output.
 
 Report the verification results in the reply:
@@ -132,11 +176,12 @@ Report the verification results in the reply:
 - Any cards deleted for lacking a source passage
 - Any omissions from the source (content that should have been a card but wasn't)
 - Any accuracy flags (cards where wording diverged from the source)
+- Dedup summary: cards removed and which rule applied to each
 
 If issues are found, fix the remnote file before reporting.
 
-### 8) Output
+### 9) Output
 
 - Write the remnote content to the **exact save path** given.
 - If the parent directory does not exist, create it.
-- Reply with: source used, save path, total card count, and the fidelity verification report.
+- Reply with: source used, save path, total card count, and the fidelity verification report (including dedup summary).
