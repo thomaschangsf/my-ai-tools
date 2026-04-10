@@ -2,7 +2,7 @@
 
 PR review using **`@pr-review-agent.md`** and **`@pr-review-bar.md`**.
 
-- Apply the **review bar** (depth, themes, style, severity, 10 recommendations): **`@pr-review-bar.md`**
+- Apply the **review bar** (depth, themes, style, severity, 7 recommendations): **`@pr-review-bar.md`**
 - Apply **everything below** for Git scope, what to review, how to point at changes on GitHub, and the **exact fields** each recommendation must include.
 
 ---
@@ -63,8 +63,8 @@ Do **not** cite post-PR line numbers for code that did **not** change unless lab
 ## Output
 
 - Always print: (a) `git diff --name-only "$MERGE_BASE"..HEAD | wc -l` as **PR total files**, and (b) the count of **scoped non-test `.py` paths** actually reviewed, so I can verify against GitHub.
-- Exactly **10** recommendations, meeting the bar in **`@pr-review-bar.md`** (themes, style, severity).
-- **Order by severity (required):** Number recommendations **1–10 in descending order of risk** — **recommendation 1 = highest severity** (the issue authors should address first). Use **high → medium → low** as the primary sort. When two items share the same severity, order by: **definite** before **needs verification**, then by **blast radius** (e.g. export/training correctness and contract breaks before observability or style). If the scoped diff cannot support ten distinct high-severity items, fill the lower numbers with the strongest available findings and use medium/low toward the end—**do not** inflate severity to fill slots; keep labels honest per **`@pr-review-bar.md`**.
+- Exactly **7** recommendations, meeting the bar in **`@pr-review-bar.md`** (themes, style, severity).
+- **Order by severity (required):** Number recommendations **1–7 in descending order of risk** — **recommendation 1 = highest severity** (the issue authors should address first). Use **high → medium → low** as the primary sort. When two items share the same severity, order by: **definite** before **needs verification**, then by **blast radius** (e.g. export/training correctness and contract breaks before observability or style). If the scoped diff cannot support seven distinct items, state that explicitly and give as many substantive recommendations as the diff supports—**do not** inflate severity to fill slots; keep labels honest per **`@pr-review-bar.md`**.
 - **Author-oriented code blocks:** Each recommendation’s two fences are **Current (PR branch)** — what reviewers see on the PR — and **Recommended** — what to implement if they accept the finding. Do **not** label them “Before/After” in the sense of merge-base vs. PR unless you are explicitly auditing the raw patch for parity.
 
 ### For each recommendation — include **all** of the following, in this order
@@ -92,7 +92,14 @@ Do **not** cite post-PR line numbers for code that did **not** change unless lab
 
     Keep each **Current** block short.
 
-  - **Recommended** — put the **suggested end state after applying this recommendation** in a **separate** fence. This is the actionable target: patched code, restored validation, added guard/log, deprecation shim, etc. Use minimal lines. If the fix is non-code (process, docs, follow-up ticket), use a short bullet list inside the fence or one explicit sentence in prose **instead of** fake code.
+  - **Recommended** — put the **suggested end state after applying this recommendation** in a **separate** fence. **This fence must contain real, paste-ready code changes**—not advice disguised as comments (e.g. do **not** use only `# TODO:` or `# Prefer …` lines without an actual implementation).
+
+    **Required shape for code fixes (default for all 7 items):**
+    - Show **concrete Python** (or the relevant language) that authors could apply: a full replacement function/class, a minimal patched block, or a **unified-diff-style** snippet with `+`/`-` lines if that is clearer.
+    - Match the project’s imports, naming, and types; keep the snippet **minimal** but **complete enough to implement** the fix (e.g. include `initializer=` / `initargs=` if recommending a pool change, include the full `if` guard if recommending validation).
+    - **Forbidden in Recommended:** comment-only placeholders, pseudo-code without real syntax, or vague bullets that do not map to specific symbols/lines.
+
+    **Non-code exception (rare):** Use at most **one** of the seven recommendations for pure process/docs/release notes. In that case the **Recommended** fence must be explicit prose (e.g. “Add to CHANGELOG: …” or “Open ticket: …”) and the **Title** must say **(non-code)**. All other recommendations **must** include real code.
 
   This must **not** be the same fence as **Current (PR branch)**.
 
@@ -100,7 +107,7 @@ Do **not** cite post-PR line numbers for code that did **not** change unless lab
 
 - **PR tie-in** — one sentence: how this recommendation maps to the **specific** lines changed (added/removed) in that file’s diff.
 
-**Learnings captured here:** (1) **Two separate code fences**: **Current (PR branch)** then **Recommended**—actionable for authors, not a replay of “old vs. new” from Git’s perspective. (2) **Context** (what/why link) before impact. (3) **Plain-language “change block”** plus mandatory **`@@` hunk header** so anchors match the PR patch. (4) **Diff-first** findings; **Current** reflects **HEAD** for that block (green side or post-deletion state), not the merge-base snapshot. (5) **Recommendations sorted by severity**—#1 is the highest-risk item; do not order by file path or discovery order.
+**Learnings captured here:** (1) **Two separate code fences**: **Current (PR branch)** then **Recommended**—**Recommended must be implementable code** (see rules above), not a replay of “old vs. new” from Git’s perspective. (2) **Context** (what/why link) before impact. (3) **Plain-language “change block”** plus mandatory **`@@` hunk header** so anchors match the PR patch. (4) **Diff-first** findings; **Current** reflects **HEAD** for that block (green side or post-deletion state), not the merge-base snapshot. (5) **Recommendations sorted by severity**—#1 is the highest-risk item; do not order by file path or discovery order.
 
 ---
 
@@ -108,4 +115,4 @@ Do **not** cite post-PR line numbers for code that did **not** change unless lab
 
 1. List the scoped changed `.py` files (non-test) from `git diff --name-only "$MERGE_BASE"..HEAD`.
 2. For each file, review **only** the output of `git diff "$MERGE_BASE"..HEAD -- <file>` (each **change block** in that diff). Do not full-file review except to resolve ambiguity needed for a finding that is still tied to a specific PR change.
-3. Draft findings, assign **severity / confidence** per **`@pr-review-bar.md`**, then **sort into final order** (highest severity first, then tie-breakers per **Output** above) before numbering **1–10** in the written review.
+3. Draft findings, assign **severity / confidence** per **`@pr-review-bar.md`**, then **sort into final order** (highest severity first, then tie-breakers per **Output** above) before numbering **1–7** in the written review.
